@@ -7,9 +7,7 @@ import {
     useToast, fmtDate, fmtMoney, today,
 } from "../components.jsx";
 
-const INC_CATS = ["চাঁদা","দান","অনুদান","প্রকল্প আয়","ব্যাংক সুদ","অন্যান্য"];
-const EXP_CATS = ["অফিস ভাড়া","খাবার","পরিবহন","প্রকল্প ব্যয়","বেতন","সেবা চার্জ","অন্যান্য"];
-
+// ── Constants ─────────────────────────────────────────────
 const MONTHS = [
     { value:"01", label:"জানুয়ারি"   },
     { value:"02", label:"ফেব্রুয়ারি" },
@@ -29,53 +27,82 @@ const curYear  = new Date().getFullYear();
 const curMonth = String(new Date().getMonth() + 1).padStart(2, "0");
 const YEARS    = Array.from({ length: 6 }, (_, i) => curYear - 1 + i);
 
+// depositMonth format: "2026-03"
 const EMPTY_COL = {
-    type:"income", category:"চাঁদা",
-    memberId:"", bankAccountId:"",
+    memberId:        "",
+    bankAccountId:   "",
     collectionMonth: curMonth,
     collectionYear:  String(curYear),
-    date: today(), description:"মাসিক চাঁদা", amount:"", notes:"",
-};
-
-const EMPTY_GEN = {
-    type:"income", category:"",
-    memberId:"", bankAccountId:"",
-    collectionMonth:"", collectionYear:"",
-    date: today(), description:"", amount:"", notes:"",
+    date:            today(),
+    description:     "মাসিক চাঁদা",
+    amount:          "",
+    notes:           "",
+    status:          "paid",
 };
 
 const SectionTitle = ({ children }) => (
     <div style={{
-        fontSize:"0.72rem", fontWeight:700, color:"var(--primary)",
-        textTransform:"uppercase", letterSpacing:"0.08em",
-        borderBottom:"2px solid var(--border)", paddingBottom:6, marginBottom:"1rem",
+        fontSize: "0.72rem", fontWeight: 700, color: "var(--primary)",
+        textTransform: "uppercase", letterSpacing: "0.08em",
+        borderBottom: "2px solid var(--border)", paddingBottom: 6, marginBottom: "1rem",
     }}>{children}</div>
 );
 
+// ── Helpers ───────────────────────────────────────────────
+const monthLabel = v => MONTHS.find(m => m.value === v)?.label || v || "—";
+
+// "2026-03" → { year:"2026", month:"03" }
+const parseDepositMonth = dm => {
+    if (!dm) return { year: "", month: "" };
+    const parts = dm.split("-");
+    return { year: parts[0] || "", month: parts[1] || "" };
+};
+
+// ── STATUS Badge ──────────────────────────────────────────
+const StatusBadge = ({ status }) => {
+    const map = {
+        paid:    { color: "var(--success)", label: "পরিশোধিত"  },
+        unpaid:  { color: "var(--danger)",  label: "বকেয়া"     },
+        partial: { color: "var(--gold)",    label: "আংশিক"     },
+    };
+    const s = map[status] || { color: "var(--muted)", label: status || "—" };
+    return <Badge color={s.color}>{s.label}</Badge>;
+};
+
+// ================================================================
+// MAIN COMPONENT
+// ================================================================
 export default function Accounts() {
     const [data,      setData]      = useState([]);
-    const [summary,   setSummary]   = useState({ income:0, expense:0, balance:0 });
+    const [summary,   setSummary]   = useState({ total_paid: 0, total_pending: 0, count: 0 });
     const [members,   setMembers]   = useState([]);
     const [banks,     setBanks]     = useState([]);
     const [loading,   setLoading]   = useState(true);
-    const [filter,    setFilter]    = useState("all");
-    const [entryType, setEntryType] = useState("collection");
+    const [filter,    setFilter]    = useState("all");   // all | paid | unpaid | partial
     const [modal,     setModal]     = useState(false);
     const [form,      setForm]      = useState(EMPTY_COL);
     const [saving,    setSaving]    = useState(false);
     const [toast,     showToast]    = useToast();
 
+    // ── Load ──────────────────────────────────────────────
     const load = useCallback(async () => {
         try {
             setLoading(true);
+
+            // filter → status param পাঠাই
+            const statusParam = filter !== "all" ? `?status=${filter}` : "";
+
             const [res, mems, bankList] = await Promise.all([
-                getAccounts(filter),
+                getAccounts(statusParam),   // api.js: getAccounts(param) → /api/accounts{param}
                 getMembers(),
                 getBankAccounts(),
             ]);
-            const rows = res.data || res;
-            const sum  = res.summary || { income:0, expense:0, balance:0 };
-            setData(Array.isArray(rows) ? rows : []);
+
+            // Backend returns { data: [...], summary: {...} }
+            const rows = Array.isArray(res) ? res : (res.data || []);
+            const sum  = res.summary || { total_paid: 0, total_pending: 0, count: 0 };
+
+            setData(rows);
             setSummary(sum);
             setMembers(Array.isArray(mems) ? mems : []);
             setBanks(Array.isArray(bankList) ? bankList : []);
@@ -90,87 +117,91 @@ export default function Accounts() {
 
     const set = f => e => setForm(p => ({ ...p, [f]: e.target.value }));
 
-    const monthLabel = v => MONTHS.find(m => m.value === v)?.label || v || "—";
-
-    const buildDesc = (mid, month, year) => {
-        const mem = members.find(m => String(m.id) === String(mid));
-        if (!mem) return form.description;
-        return `${mem.name} — মাসিক চাঁদা ${monthLabel(month)} ${year}`;
-    };
-
+    // ── Member select → auto-fill amount & description ────
     const handleMemberChange = e => {
         const mid = e.target.value;
         const mem = members.find(m => String(m.id) === String(mid));
-        setForm(p => ({
-            ...p,
-            memberId:    mid,
-            amount:      mem?.fee ?? p.amount,
-            description: buildDesc(mid, p.collectionMonth, p.collectionYear),
-        }));
+        setForm(p => {
+            const desc = mem
+                ? `${mem.name} — মাসিক চাঁদা ${monthLabel(p.collectionMonth)} ${p.collectionYear}`
+                : p.description;
+            return {
+                ...p,
+                memberId:    mid,
+                amount:      mem?.fee ?? p.amount,
+                description: desc,
+            };
+        });
     };
 
     const handleMonthChange = e => {
         const month = e.target.value;
-        setForm(p => ({
-            ...p,
-            collectionMonth: month,
-            description:     buildDesc(p.memberId, month, p.collectionYear),
-        }));
+        setForm(p => {
+            const mem = members.find(m => String(m.id) === String(p.memberId));
+            return {
+                ...p,
+                collectionMonth: month,
+                description: mem
+                    ? `${mem.name} — মাসিক চাঁদা ${monthLabel(month)} ${p.collectionYear}`
+                    : p.description,
+            };
+        });
     };
 
     const handleYearChange = e => {
         const year = e.target.value;
-        setForm(p => ({
-            ...p,
-            collectionYear: year,
-            description:    buildDesc(p.memberId, p.collectionMonth, year),
-        }));
+        setForm(p => {
+            const mem = members.find(m => String(m.id) === String(p.memberId));
+            return {
+                ...p,
+                collectionYear: year,
+                description: mem
+                    ? `${mem.name} — মাসিক চাঁদা ${monthLabel(p.collectionMonth)} ${year}`
+                    : p.description,
+            };
+        });
     };
 
-    const openAdd = type => {
-        setEntryType(type);
-        setForm(type === "collection" ? EMPTY_COL : EMPTY_GEN);
+    // ── Open add/edit modal ───────────────────────────────
+    const openAdd = () => {
+        setForm(EMPTY_COL);
         setModal(true);
     };
 
     const openEdit = r => {
-        const isCol = !!r.memberId;
-        setEntryType(isCol ? "collection" : "general");
+        // deposit_month from API: "2026-03"
+        const { year, month } = parseDepositMonth(r.deposit_month);
         setForm({
             id:              r.id,
-            type:            r.txType || "income",
-            category:        r.category || "",
-            memberId:        r.memberId || "",
-            bankAccountId:   r.bankAccountId || "",
-            collectionMonth: r.collectionMonth || "",
-            collectionYear:  r.collectionYear  || "",
-            date:            r.date || today(),
-            description:     r.description || "",
-            amount:          r.amount || "",
-            notes:           r.notes  || "",
+            memberId:        r.member_id        || "",
+            bankAccountId:   r.bank_account_id  || "",
+            collectionMonth: month,
+            collectionYear:  year,
+            date:            r.deposit_date     || today(),
+            description:     r.description      || "",
+            amount:          r.amount           || "",
+            notes:           "",
+            status:          r.status           || "paid",
         });
         setModal(true);
     };
 
+    // ── Submit ────────────────────────────────────────────
     const handleSubmit = async e => {
         e.preventDefault();
-        if (!form.amount)      return showToast("পরিমাণ আবশ্যক", "error");
-        if (!form.description) return showToast("বিবরণ আবশ্যক",  "error");
-        if (entryType === "collection" && !form.memberId)
-            return showToast("সদস্য বেছে নিন", "error");
+        if (!form.memberId)  return showToast("সদস্য বেছে নিন", "error");
+        if (!form.amount)    return showToast("পরিমাণ আবশ্যক",  "error");
 
+        // Rust DepositPayload এর field names (camelCase, serde rename)
         const payload = {
-            memberId:        form.memberId        || null,
-            bankAccountId:   form.bankAccountId   || null,
-          //  collectionMonth: form.collectionMonth || null,
-            collectionYear:  form.collectionYear  || null,
-        //    tx_type:         form.tx_type  || null,
-            date:            form.date,
-        //    type:            form.type || 'test',
-         //   category:        form.category        || null,
-        //    description:     form.description,
-            amount:          Number(form.amount),
-            notes:           form.notes           || null,
+            memberId:      Number(form.memberId),
+            bankAccountId: Number(form.bankAccountId) || null,
+            depositMonth:  `${form.collectionYear}-${form.collectionMonth}`, // "2026-03"
+            depositDate:   form.date,
+            amount:        Number(form.amount),
+            status:        form.status || "paid",
+            description:   form.description || null,
+            reference:     null,
         };
 
         try {
@@ -189,7 +220,7 @@ export default function Accounts() {
     };
 
     const handleDelete = async id => {
-        if (!window.confirm("এই এন্ট্রি মুছে ফেলবেন?")) return;
+        if (!window.confirm("এই এন্ট্রি ও সংশ্লিষ্ট লেনদেন মুছে ফেলবেন?")) return;
         try {
             await deleteAccount(id);
             showToast("মুছে ফেলা হয়েছে");
@@ -201,80 +232,105 @@ export default function Accounts() {
 
     const selectedMember = members.find(m => String(m.id) === String(form.memberId));
 
+    // ── Render ────────────────────────────────────────────
     return (
         <div>
             <Toast toast={toast} />
 
-            <PageHeader title="হিসাব ব্যবস্থাপনা">
-                <Btn icon="add" variant="primary" onClick={() => openAdd("collection")}>
-                    মাসিক চাঁদা কালেকশন
-                </Btn>
-                <Btn icon="add" variant="ghost" onClick={() => openAdd("general")}>
-                    সাধারণ এন্ট্রি
+            <PageHeader title="মাসিক চাঁদা কালেকশন">
+                <Btn icon="add" variant="primary" onClick={openAdd}>
+                    নতুন কালেকশন এন্ট্রি
                 </Btn>
             </PageHeader>
 
+            {/* ── Stats ── */}
             <StatsGrid>
-                <StatCard label="মোট আয়"
-                          value={fmtMoney(summary.income)}
-                          icon="money_in" color="var(--success)" />
-                <StatCard label="মোট ব্যয়"
-                          value={fmtMoney(summary.expense)}
-                          icon="money_out" color="var(--danger)" />
-                <StatCard label="নিট ব্যালেন্স"
-                          value={fmtMoney(summary.balance)}
-                          icon="accounts"
-                          color={summary.balance >= 0 ? "var(--gold)" : "var(--danger)"} />
-                <StatCard label="মোট এন্ট্রি"
-                          value={data.length}
-                          icon="trend_up" color="var(--primary)" />
+                <StatCard
+                    label="মোট পরিশোধিত"
+                    value={fmtMoney(summary.total_paid)}
+                    icon="money_in"
+                    color="var(--success)"
+                />
+                <StatCard
+                    label="মোট বকেয়া"
+                    value={fmtMoney(summary.total_pending)}
+                    icon="money_out"
+                    color="var(--danger)"
+                />
+                <StatCard
+                    label="মোট এন্ট্রি"
+                    value={summary.count || data.length}
+                    icon="trend_up"
+                    color="var(--primary)"
+                />
+                <StatCard
+                    label="সদস্য সংখ্যা"
+                    value={members.length}
+                    icon="members"
+                    color="var(--gold)"
+                />
             </StatsGrid>
 
+            {/* ── Filter Tabs ── */}
             <FilterTabs
                 value={filter}
                 onChange={setFilter}
                 options={[
-                    { value:"all",     label:"সকল"  },
-                    { value:"income",  label:"আয়"   },
-                    { value:"expense", label:"ব্যয়" },
+                    { value: "all",     label: "সকল"       },
+                    { value: "paid",    label: "পরিশোধিত"  },
+                    { value: "unpaid",  label: "বকেয়া"     },
+                    { value: "partial", label: "আংশিক"     },
                 ]}
             />
 
+            {/* ── Table ── */}
             <Table
                 loading={loading}
                 cols={[
-                    { key:"date", label:"তারিখ",
-                        render: r => fmtDate(r.date) },
-                    { key:"txType", label:"ধরন",
+                    {
+                        key: "deposit_date",
+                        label: "তারিখ",
+                        render: r => fmtDate(r.deposit_date),
+                    },
+                    {
+                        key: "member_name",
+                        label: "সদস্য",
+                        render: r => r.member_name || "—",
+                    },
+                    {
+                        key: "deposit_month",
+                        label: "মাস / বছর",
+                        render: r => {
+                            if (!r.deposit_month) return "—";
+                            const { year, month } = parseDepositMonth(r.deposit_month);
+                            return `${monthLabel(month)} ${year}`;
+                        },
+                    },
+                    {
+                        key: "bank_name",
+                        label: "ব্যাংক",
+                        render: r => r.bank_name
+                            ? `${r.bank_name} (${r.account_number || ""})`
+                            : "নগদ",
+                    },
+                    {
+                        key: "amount",
+                        label: "পরিমাণ",
                         render: r => (
-                            <Badge color={r.txType === "income" ? "var(--success)" : "var(--danger)"}>
-                                {r.txType === "income" ? "আয়" : "ব্যয়"}
-                            </Badge>
-                        )
+                            <span style={{ fontWeight: 700, color: "var(--success)" }}>
+                                +{fmtMoney(r.amount)}
+                            </span>
+                        ),
                     },
-                    { key:"memberName", label:"সদস্য",
-                        render: r => r.memberName || "—" },
-                    { key:"collectionMonth", label:"মাস/বছর",
-                        render: r => r.collectionMonth
-                            ? `${monthLabel(r.collectionMonth)} ${r.collectionYear || ""}`
-                            : "—"
+                    {
+                        key: "status",
+                        label: "অবস্থা",
+                        render: r => <StatusBadge status={r.status} />,
                     },
-                    { key:"bankName", label:"ব্যাংক",
-                        render: r => r.bankName
-                            ? `${r.bankName} (${r.accountNumber || ""})`
-                            : "—"
-                    },
-                    { key:"category",    label:"খাত"    },
-                    { key:"description", label:"বিবরণ"  },
-                    { key:"amount", label:"পরিমাণ",
-                        render: r => (
-                            <span style={{
-                                fontWeight:700,
-                                color: r.txType === "income" ? "var(--success)" : "var(--danger)"
-                            }}>
-                {r.txType === "income" ? "+" : "-"}{fmtMoney(r.amount)}
-              </span>
-                        )
+                    {
+                        key: "description",
+                        label: "বিবরণ",
+                        render: r => r.description || "—",
                     },
                 ]}
                 rows={data}
@@ -282,190 +338,123 @@ export default function Accounts() {
                 onDelete={handleDelete}
             />
 
+            {/* ── Modal ── */}
             {modal && (
                 <Modal
-                    title={
-                        form.id
-                            ? "এন্ট্রি সম্পাদনা"
-                            : entryType === "collection"
-                                ? "মাসিক চাঁদা কালেকশন এন্ট্রি"
-                                : "সাধারণ আয়/ব্যয় এন্ট্রি"
-                    }
+                    title={form.id ? "এন্ট্রি সম্পাদনা" : "মাসিক চাঁদা কালেকশন এন্ট্রি"}
                     onClose={() => setModal(false)}
                     wide
                 >
                     <form onSubmit={handleSubmit}>
+                        <SectionTitle>সদস্য ও কালেকশন তথ্য</SectionTitle>
 
-                        {/* ══ COLLECTION FORM ══ */}
-                        {entryType === "collection" && (
-                            <>
-                                <SectionTitle>সদস্য ও কালেকশন তথ্য</SectionTitle>
-                                <FormGrid>
-                                    <Field label="সদস্য" required half>
-                                        <Select value={form.memberId} onChange={handleMemberChange}>
-                                            <option value="">— সদস্য বেছে নিন —</option>
-                                            {members.map(m => (
-                                                <option key={m.id} value={m.id}>
-                                                    {m.name} ({m.phone}) — চাঁদা {fmtMoney(m.fee)}
-                                                </option>
-                                            ))}
-                                        </Select>
-                                    </Field>
+                        <FormGrid>
+                            {/* সদস্য */}
+                            <Field label="সদস্য" required half>
+                                <Select value={form.memberId} onChange={handleMemberChange}>
+                                    <option value="">— সদস্য বেছে নিন —</option>
+                                    {members.map(m => (
+                                        <option key={m.id} value={m.id}>
+                                            {m.name} ({m.phone}) — চাঁদা {fmtMoney(m.fee)}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </Field>
 
-                                    <Field label="পরিমাণ (৳)" required half>
-                                        <Input
-                                            type="number" step="0.01"
-                                            value={form.amount}
-                                            onChange={set("amount")}
-                                            placeholder="0.00"
-                                        />
-                                    </Field>
+                            {/* পরিমাণ */}
+                            <Field label="পরিমাণ (৳)" required half>
+                                <Input
+                                    type="number"
+                                    step="0.01"
+                                    value={form.amount}
+                                    onChange={set("amount")}
+                                    placeholder="0.00"
+                                />
+                            </Field>
 
-                                    <Field label="কালেকশন মাস" required half>
-                                        <Select value={form.collectionMonth} onChange={handleMonthChange}>
-                                            {MONTHS.map(m => (
-                                                <option key={m.value} value={m.value}>{m.label}</option>
-                                            ))}
-                                        </Select>
-                                    </Field>
+                            {/* কালেকশন মাস */}
+                            <Field label="কালেকশন মাস" required half>
+                                <Select value={form.collectionMonth} onChange={handleMonthChange}>
+                                    {MONTHS.map(m => (
+                                        <option key={m.value} value={m.value}>{m.label}</option>
+                                    ))}
+                                </Select>
+                            </Field>
 
-                                    <Field label="কালেকশন বছর" required half>
-                                        <Select value={form.collectionYear} onChange={handleYearChange}>
-                                            {YEARS.map(y => (
-                                                <option key={y} value={String(y)}>{y}</option>
-                                            ))}
-                                        </Select>
-                                    </Field>
+                            {/* কালেকশন বছর */}
+                            <Field label="কালেকশন বছর" required half>
+                                <Select value={form.collectionYear} onChange={handleYearChange}>
+                                    {YEARS.map(y => (
+                                        <option key={y} value={String(y)}>{y}</option>
+                                    ))}
+                                </Select>
+                            </Field>
 
-                                    <Field label="ব্যাংক অ্যাকাউন্ট" half>
-                                        <Select value={form.bankAccountId} onChange={set("bankAccountId")}>
-                                            <option value="">— নগদ / ব্যাংক বেছে নিন —</option>
-                                            {banks.map(b => (
-                                                <option key={b.id} value={b.id}>
-                                                    {b.bank_name} — {b.account_name} ({b.account_number})
-                                                </option>
-                                            ))}
-                                        </Select>
-                                    </Field>
+                            {/* ব্যাংক */}
+                            <Field label="ব্যাংক অ্যাকাউন্ট" half>
+                                <Select value={form.bankAccountId} onChange={set("bankAccountId")}>
+                                    <option value="">— নগদ —</option>
+                                    {banks.map(b => (
+                                        <option key={b.id} value={b.id}>
+                                            {b.bank_name} — {b.account_name} ({b.account_number})
+                                        </option>
+                                    ))}
+                                </Select>
+                            </Field>
 
-                                    <Field label="তারিখ" half>
-                                        <Input type="date" value={form.date} onChange={set("date")} />
-                                    </Field>
+                            {/* তারিখ */}
+                            <Field label="তারিখ" required half>
+                                <Input type="date" value={form.date} onChange={set("date")} />
+                            </Field>
 
-                                    <Field label="বিবরণ" required>
-                                        <Input
-                                            value={form.description}
-                                            onChange={set("description")}
-                                            placeholder="বিবরণ লিখুন"
-                                        />
-                                    </Field>
+                            {/* অবস্থা */}
+                            <Field label="অবস্থা" half>
+                                <Select value={form.status} onChange={set("status")}>
+                                    <option value="paid">পরিশোধিত</option>
+                                    <option value="unpaid">বকেয়া</option>
+                                    <option value="partial">আংশিক</option>
+                                </Select>
+                            </Field>
 
-                                    <Field label="মন্তব্য">
-                                        <Textarea value={form.notes || ""} onChange={set("notes")} />
-                                    </Field>
-                                </FormGrid>
+                            {/* বিবরণ */}
+                            <Field label="বিবরণ" half>
+                                <Input
+                                    value={form.description}
+                                    onChange={set("description")}
+                                    placeholder="বিবরণ লিখুন"
+                                />
+                            </Field>
+                        </FormGrid>
 
-                                {selectedMember && (
-                                    <div style={{
-                                        background:"var(--bg)",
-                                        border:"1px solid var(--border)",
-                                        borderRadius:10, padding:"12px 16px",
-                                        marginBottom:"1rem",
-                                    }}>
-                                        <div style={{
-                                            fontSize:"0.72rem", fontWeight:700,
-                                            color:"var(--muted)", textTransform:"uppercase",
-                                            marginBottom:6,
-                                        }}>
-                                            প্রিভিউ
-                                        </div>
-                                        <div style={{
-                                            display:"flex", gap:"1.5rem",
-                                            flexWrap:"wrap", fontSize:"0.875rem",
-                                        }}>
-                                            <span>👤 <strong>{selectedMember.name}</strong></span>
-                                            <span>📅 {monthLabel(form.collectionMonth)} {form.collectionYear}</span>
-                                            <span style={{ color:"var(--success)", fontWeight:700 }}>
-                        ৳ {Number(form.amount || 0).toLocaleString("bn-BD")}
-                      </span>
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-
-                        {/* ══ GENERAL FORM ══ */}
-                        {entryType === "general" && (
-                            <>
-                                <SectionTitle>লেনদেনের তথ্য</SectionTitle>
-                                <FormGrid>
-                                    <Field label="ধরন" half>
-                                        <Select
-                                            value={form.type}
-                                            onChange={e =>
-                                                setForm(p => ({ ...p, type: e.target.value, category: "" }))
-                                            }
-                                        >
-                                            <option value="income">আয়</option>
-                                            <option value="expense">ব্যয়</option>
-                                        </Select>
-                                    </Field>
-
-                                    <Field label="তারিখ" half>
-                                        <Input type="date" value={form.date} onChange={set("date")} />
-                                    </Field>
-
-                                    <Field label="খাত" half>
-                                        <Select value={form.category} onChange={set("category")}>
-                                            <option value="">— বেছে নিন —</option>
-                                            {(form.type === "income" ? INC_CATS : EXP_CATS).map(c => (
-                                                <option key={c}>{c}</option>
-                                            ))}
-                                        </Select>
-                                    </Field>
-
-                                    <Field label="পরিমাণ (৳)" required half>
-                                        <Input
-                                            type="number" step="0.01"
-                                            value={form.amount}
-                                            onChange={set("amount")}
-                                            placeholder="0.00"
-                                        />
-                                    </Field>
-
-                                    <Field label="ব্যাংক অ্যাকাউন্ট" half>
-                                        <Select value={form.bankAccountId} onChange={set("bankAccountId")}>
-                                            <option value="">— নগদ / ব্যাংক বেছে নিন —</option>
-                                            {banks.map(b => (
-                                                <option key={b.id} value={b.id}>
-                                                    {b.bankName} — {b.accountName} ({b.accountNumber})
-                                                </option>
-                                            ))}
-                                        </Select>
-                                    </Field>
-
-                                    <Field label="সদস্য (ঐচ্ছিক)" half>
-                                        <Select value={form.memberId} onChange={set("memberId")}>
-                                            <option value="">— সদস্য (যদি প্রযোজ্য) —</option>
-                                            {members.map(m => (
-                                                <option key={m.id} value={m.id}>{m.name}</option>
-                                            ))}
-                                        </Select>
-                                    </Field>
-
-                                    <Field label="বিবরণ" required>
-                                        <Input
-                                            value={form.description}
-                                            onChange={set("description")}
-                                            placeholder="লেনদেনের বিবরণ লিখুন"
-                                        />
-                                    </Field>
-
-                                    <Field label="মন্তব্য">
-                                        <Textarea value={form.notes || ""} onChange={set("notes")} />
-                                    </Field>
-                                </FormGrid>
-                            </>
+                        {/* Preview */}
+                        {selectedMember && (
+                            <div style={{
+                                background: "var(--bg)",
+                                border: "1px solid var(--border)",
+                                borderRadius: 10, padding: "12px 16px",
+                                marginBottom: "1rem",
+                            }}>
+                                <div style={{
+                                    fontSize: "0.72rem", fontWeight: 700,
+                                    color: "var(--muted)", textTransform: "uppercase",
+                                    marginBottom: 6,
+                                }}>প্রিভিউ</div>
+                                <div style={{
+                                    display: "flex", gap: "1.5rem",
+                                    flexWrap: "wrap", fontSize: "0.875rem",
+                                }}>
+                                    <span>👤 <strong>{selectedMember.name}</strong></span>
+                                    <span>📅 {monthLabel(form.collectionMonth)} {form.collectionYear}</span>
+                                    <span>🏦 {banks.find(b => String(b.id) === String(form.bankAccountId))?.bank_name || "নগদ"}</span>
+                                    <span style={{ color: "var(--success)", fontWeight: 700 }}>
+                                        ৳ {Number(form.amount || 0).toLocaleString("bn-BD")}
+                                    </span>
+                                    <StatusBadge status={form.status} />
+                                </div>
+                                <div style={{ fontSize: "0.75rem", color: "var(--muted)", marginTop: 6 }}>
+                                    🔑 Ref: DEP-{form.memberId}-{form.collectionYear}{form.collectionMonth}
+                                </div>
+                            </div>
                         )}
 
                         <FormActions onCancel={() => setModal(false)} saving={saving} />
