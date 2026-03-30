@@ -45,7 +45,8 @@ export const updateMember = (id, body)  => api.put(`/members/${id}`, body);
 export const deleteMember = (id)        => api.delete(`/members/${id}`);
 
 // ── Accounts ───────────────────────────────────────────────
-export const getAccounts   = (type="")  => api.get(`/accounts${type && type !== "all" ? `?type=${type}` : ""}`);
+// পুরনো line replace করুন:
+export const getAccounts = (param = "") => api.get(`/accounts${param}`);
 export const createAccount = (body)     => api.post("/accounts", body);
 export const updateAccount = (id, body) => api.put(`/accounts/${id}`, body);
 export const deleteAccount = (id)       => api.delete(`/accounts/${id}`);
