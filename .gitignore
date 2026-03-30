@@ -1,0 +1,13 @@
+# Rust
+/target/
+**/target/
+
+# Node
+node_modules/
+
+# Env
+.env
+
+# Build files
+dist/
+build/
