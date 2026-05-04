@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { getAccounts, createAccount, updateAccount, deleteAccount, getMembers, getBankAccounts } from "../api.js";
+import { getStoredUser } from "../auth.js";
+import { getAccounts, createAccount, updateAccount, deleteAccount, approveAccount, getMembers, getBankAccounts } from "../api.js";
 import {
     Modal, Field, Input, Select, Textarea, Btn,
     StatCard, Table, Badge, Toast, PageHeader,
@@ -64,6 +65,8 @@ const StatusBadge = ({ status }) => {
         paid:    { color: "var(--success)", label: "পরিশোধিত"  },
         unpaid:  { color: "var(--danger)",  label: "বকেয়া"     },
         partial: { color: "var(--gold)",    label: "আংশিক"     },
+        pending: { color: "var(--gold)",    label: "অপেক্ষমাণ"  },
+        approved: { color: "var(--success)", label: "অনুমোদিত" },
     };
     const s = map[status] || { color: "var(--muted)", label: status || "—" };
     return <Badge color={s.color}>{s.label}</Badge>;
@@ -73,6 +76,9 @@ const StatusBadge = ({ status }) => {
 // MAIN COMPONENT
 // ================================================================
 export default function Accounts() {
+    const user        = getStoredUser();
+    const isMember    = user?.role === "member";
+    const isAdmin     = user?.role === "admin";
     const [data,      setData]      = useState([]);
     const [summary,   setSummary]   = useState({ total_paid: 0, total_pending: 0, count: 0 });
     const [members,   setMembers]   = useState([]);
@@ -99,8 +105,13 @@ export default function Accounts() {
             ]);
 
             // Backend returns { data: [...], summary: {...} }
-            const rows = Array.isArray(res) ? res : (res.data || []);
+            let rows = Array.isArray(res) ? res : (res.data || []);
             const sum  = res.summary || { total_paid: 0, total_pending: 0, count: 0 };
+
+            // Filter by logged-in member if member role
+            if (isMember && user?.id) {
+                rows = rows.filter(r => r.member_id === user.id);
+            }
 
             setData(rows);
             setSummary(sum);
@@ -111,7 +122,7 @@ export default function Accounts() {
         } finally {
             setLoading(false);
         }
-    }, [filter]);
+    }, [filter, isMember, user?.id]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -164,7 +175,13 @@ export default function Accounts() {
 
     // ── Open add/edit modal ───────────────────────────────
     const openAdd = () => {
-        setForm(EMPTY_COL);
+        setForm({
+            ...EMPTY_COL,
+            // Members: new entries default to "pending", others: "paid"
+            status: isMember ? "pending" : "paid",
+            // Members: auto-set their own ID
+            memberId: isMember ? String(user?.id || "") : "",
+        });
         setModal(true);
     };
 
@@ -230,6 +247,16 @@ export default function Accounts() {
         }
     };
 
+    const handleApprove = async id => {
+        try {
+            await approveAccount(id);
+            showToast("অনুমোদিত হয়েছে ✓");
+            load();
+        } catch (e) {
+            showToast(e.message, "error");
+        }
+    };
+
     const selectedMember = members.find(m => String(m.id) === String(form.memberId));
 
     // ── Render ────────────────────────────────────────────
@@ -237,9 +264,9 @@ export default function Accounts() {
         <div>
             <Toast toast={toast} />
 
-            <PageHeader title="মাসিক চাঁদা কালেকশন">
+            <PageHeader title={isMember ? "আমার মাসিক চাঁদা" : "মাসিক চাঁদা কালেকশন"}>
                 <Btn icon="add" variant="primary" onClick={openAdd}>
-                    নতুন কালেকশন এন্ট্রি
+                    {isMember ? "চাঁদা জমা দিন" : "নতুন কালেকশন এন্ট্রি"}
                 </Btn>
             </PageHeader>
 
@@ -292,11 +319,11 @@ export default function Accounts() {
                         label: "তারিখ",
                         render: r => fmtDate(r.deposit_date),
                     },
-                    {
+                    ...(isMember ? [] : [{
                         key: "member_name",
                         label: "সদস্য",
                         render: r => r.member_name || "—",
-                    },
+                    }]),
                     {
                         key: "deposit_month",
                         label: "মাস / বছর",
@@ -332,6 +359,27 @@ export default function Accounts() {
                         label: "বিবরণ",
                         render: r => r.description || "—",
                     },
+                    ...(isAdmin ? [{
+                        key: "actions",
+                        label: "পদক্ষেপ",
+                        render: r => r.status === "pending" ? (
+                            <Btn
+                                onClick={() => handleApprove(r.id)}
+                                style={{
+                                    padding: "4px 12px",
+                                    fontSize: "0.75rem",
+                                    background: "var(--success)",
+                                    color: "#fff",
+                                    border: "none",
+                                    borderRadius: 4,
+                                    cursor: "pointer",
+                                    fontWeight: 600,
+                                }}
+                            >
+                                অনুমোদন
+                            </Btn>
+                        ) : null,
+                    }] : []),
                 ]}
                 rows={data}
                 onEdit={openEdit}
@@ -351,14 +399,23 @@ export default function Accounts() {
                         <FormGrid>
                             {/* সদস্য */}
                             <Field label="সদস্য" required half>
-                                <Select value={form.memberId} onChange={handleMemberChange}>
-                                    <option value="">— সদস্য বেছে নিন —</option>
-                                    {members.map(m => (
-                                        <option key={m.id} value={m.id}>
-                                            {m.name} ({m.phone}) — চাঁদা {fmtMoney(m.fee)}
-                                        </option>
-                                    ))}
-                                </Select>
+                                {isMember ? (
+                                    <Input
+                                        type="text"
+                                        value={selectedMember?.name || ""}
+                                        disabled
+                                        style={{ background: "var(--bg)", color: "var(--muted)" }}
+                                    />
+                                ) : (
+                                    <Select value={form.memberId} onChange={handleMemberChange}>
+                                        <option value="">— সদস্য বেছে নিন —</option>
+                                        {members.map(m => (
+                                            <option key={m.id} value={m.id}>
+                                                {m.name} ({m.phone}) — চাঁদা {fmtMoney(m.fee)}
+                                            </option>
+                                        ))}
+                                    </Select>
+                                )}
                             </Field>
 
                             {/* পরিমাণ */}
@@ -409,11 +466,22 @@ export default function Accounts() {
 
                             {/* অবস্থা */}
                             <Field label="অবস্থা" half>
-                                <Select value={form.status} onChange={set("status")}>
-                                    <option value="paid">পরিশোধিত</option>
-                                    <option value="unpaid">বকেয়া</option>
-                                    <option value="partial">আংশিক</option>
-                                </Select>
+                                {isMember ? (
+                                    <Input
+                                        type="text"
+                                        value={form.status === "pending" ? "অপেক্ষমাণ (অ্যাডমিন অনুমোদন অপেক্ষমাণ)" : form.status}
+                                        disabled
+                                        style={{ background: "var(--bg)", color: "var(--muted)" }}
+                                    />
+                                ) : (
+                                    <Select value={form.status} onChange={set("status")}>
+                                        <option value="paid">পরিশোধিত</option>
+                                        <option value="unpaid">বকেয়া</option>
+                                        <option value="partial">আংশিক</option>
+                                        <option value="pending">অপেক্ষমাণ</option>
+                                        <option value="approved">অনুমোদিত</option>
+                                    </Select>
+                                )}
                             </Field>
 
                             {/* বিবরণ */}

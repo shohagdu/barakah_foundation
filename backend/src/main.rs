@@ -87,6 +87,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/accounts",             web::post().to(handlers::accounts::create))
                     .route("/accounts/{id}",        web::put().to(handlers::accounts::update))
                     .route("/accounts/{id}",        web::delete().to(handlers::accounts::delete))
+                    .route("/accounts/{id}/approve",web::post().to(handlers::accounts::approve))
                     .route("/bank-accounts",        web::get().to(handlers::accounts::bank_accounts))
                     //.route("/accounts/collection-summary", web::get().to(handlers::accounts::collection_summary))
 

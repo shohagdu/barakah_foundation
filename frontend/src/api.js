@@ -69,11 +69,11 @@ export const uploadFile = async (file) => {
 };
 
 // ── Accounts ───────────────────────────────────────────────
-// পুরনো line replace করুন:
 export const getAccounts = (param = "") => api.get(`/accounts${param}`);
 export const createAccount = (body)     => api.post("/accounts", body);
 export const updateAccount = (id, body) => api.put(`/accounts/${id}`, body);
 export const deleteAccount = (id)       => api.delete(`/accounts/${id}`);
+export const approveAccount = (id)      => api.post(`/accounts/${id}/approve`, {});
 
 // ── Donations ──────────────────────────────────────────────
 export const getDonations   = (search="") => api.get(`/donations${search ? `?search=${encodeURIComponent(search)}` : ""}`);

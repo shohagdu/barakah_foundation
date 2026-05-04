@@ -165,7 +165,7 @@ pub async fn create(
     let db  = pool.get_ref();
 
     // Member-এর fee বের করি
-    let member_fee: Option<(Decimal,)> = sqlx::query_as(
+    let _member_fee: Option<(Decimal,)> = sqlx::query_as(
         "SELECT fee FROM members WHERE id = ?"
     )
     .bind(p.member_id)
@@ -375,6 +375,31 @@ pub async fn delete(
 }
 
 // ================================================================
+// APPROVE — Change pending deposit to approved
+// ================================================================
+pub async fn approve(
+    pool: web::Data<MySqlPool>,
+    id:   web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    let db = pool.get_ref();
+
+    sqlx::query!(
+        "UPDATE member_deposits SET status = 'approved' WHERE id = ?",
+        *id
+    )
+    .execute(db)
+    .await?;
+
+    let sql = format!("{} WHERE md.id = ?", SELECT_BASE);
+    let row: DepositRow = sqlx::query_as(&sql)
+        .bind(*id)
+        .fetch_one(db)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(row))
+}
+
+// ================================================================
 // BANK ACCOUNTS LIST
 // ================================================================
 pub async fn bank_accounts(
@@ -393,6 +418,7 @@ pub async fn bank_accounts(
 // ================================================================
 // COLLECTION SUMMARY — মাস অনুযায়ী সদস্যদের চাঁদার রিপোর্ট
 // ================================================================
+#[allow(dead_code)]
 pub async fn collection_summary(
     pool:  web::Data<MySqlPool>,
     query: web::Query<DepositQuery>,
