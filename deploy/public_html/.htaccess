@@ -1,49 +1,134 @@
 # ============================================================
-# Barakah Foundation — Apache .htaccess
-# Location: public_html/barakah_foundation/.htaccess
+# Barakah Foundation — Apache Configuration for cPanel
+# Location: public_html/.htaccess
+# Purpose: React Router routing + API proxy + security
 # ============================================================
 
-RewriteEngine On
-RewriteBase /barakah_foundation/
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
 
-# ── Force HTTPS ──────────────────────────────────────────────
-RewriteCond %{HTTPS} off
-RewriteRule ^(.*)$ https://shohozit.com/%{REQUEST_URI} [L,R=301]
+  # ============================================================
+  # HTTPS REDIRECT (adjust domain as needed)
+  # ============================================================
+  # Uncomment and update with your domain:
+  # RewriteCond %{HTTPS} off
+  # RewriteRule ^(.*)$ https://yourdomain.com%{REQUEST_URI} [L,R=301]
 
-# ── Proxy /barakah_foundation/api/* → Rust backend port 8080 ─
-# Strips /barakah_foundation prefix, forwards /api/* to backend
-RewriteCond %{REQUEST_URI} ^/barakah_foundation/api [NC]
-RewriteRule ^api/(.*)$ http://127.0.0.1:8080/api/$1 [P,L]
+  # ============================================================
+  # API PROXY - Forward /api/* to backend (port 8080)
+  # ============================================================
+  <IfModule mod_proxy.c>
+    ProxyPreserveHost On
+    ProxyPassMatch ^/api/(.*)$ http://127.0.0.1:8080/api/$1 [P]
+    ProxyPassReverse /api/ http://127.0.0.1:8080/
+  </IfModule>
 
-# ── React SPA fallback ───────────────────────────────────────
-# All non-file, non-directory routes → index.html
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ /barakah_foundation/index.html [L]
-
-# ── Security headers ─────────────────────────────────────────
-<IfModule mod_headers.c>
-    Header always set X-Content-Type-Options "nosniff"
-    Header always set X-Frame-Options "SAMEORIGIN"
-    Header always set X-XSS-Protection "1; mode=block"
-    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  # ============================================================
+  # REACT SPA ROUTING
+  # ============================================================
+  # Rewrite all routes to index.html (except existing files/dirs)
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [QSA,L]
 </IfModule>
 
-# ── Cache static assets ──────────────────────────────────────
+# ============================================================
+# SECURITY HEADERS
+# ============================================================
+<IfModule mod_headers.c>
+    # Prevent MIME type sniffing
+    Header always set X-Content-Type-Options "nosniff"
+
+    # Clickjacking protection
+    Header always set X-Frame-Options "SAMEORIGIN"
+
+    # XSS protection
+    Header always set X-XSS-Protection "1; mode=block"
+
+    # Referrer policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+
+    # Content Security Policy (adjust as needed)
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
+
+    # Permissions
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# ============================================================
+# CACHING - Static Assets
+# ============================================================
 <IfModule mod_expires.c>
     ExpiresActive On
-    ExpiresByType text/css               "access plus 1 year"
-    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresDefault A2592000
+
+    # Cache images for 1 year
     ExpiresByType image/png              "access plus 1 year"
     ExpiresByType image/jpeg             "access plus 1 year"
+    ExpiresByType image/gif              "access plus 1 year"
     ExpiresByType image/svg+xml          "access plus 1 year"
     ExpiresByType image/x-icon           "access plus 1 year"
-    ExpiresByType font/woff2             "access plus 1 year"
+    ExpiresByType image/webp             "access plus 1 year"
+
+    # Cache CSS & JS for 1 year
+    ExpiresByType text/css               "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType application/x-javascript "access plus 1 year"
+
+    # Don't cache HTML (always fetch latest)
     ExpiresByType text/html              "access plus 0 seconds"
+
+    # Cache fonts
+    ExpiresByType font/woff              "access plus 1 year"
+    ExpiresByType font/woff2             "access plus 1 year"
+    ExpiresByType application/x-font-ttf "access plus 1 year"
 </IfModule>
 
-# ── Block access to sensitive files ──────────────────────────
-<FilesMatch "\.(env|sh|sql|log|pid|toml|lock)$">
+# ============================================================
+# COMPRESSION
+# ============================================================
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html
+    AddOutputFilterByType DEFLATE text/plain
+    AddOutputFilterByType DEFLATE text/xml
+    AddOutputFilterByType DEFLATE text/css
+    AddOutputFilterByType DEFLATE text/javascript
+    AddOutputFilterByType DEFLATE application/xml
+    AddOutputFilterByType DEFLATE application/xhtml+xml
+    AddOutputFilterByType DEFLATE application/rss+xml
+    AddOutputFilterByType DEFLATE application/javascript
+    AddOutputFilterByType DEFLATE application/x-javascript
+    AddOutputFilterByType DEFLATE application/x-font-ttf
+    AddOutputFilterByType DEFLATE application/x-font-opentype
+    AddOutputFilterByType DEFLATE application/vnd.ms-fontobject
+    AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# ============================================================
+# FILE TYPE HANDLING
+# ============================================================
+# Don't list directory contents
+Options -Indexes
+
+# Set UTF-8 as default charset
+AddCharset UTF-8 .html .css .js .json .jsx
+
+# MIME types
+AddType application/json .json
+AddType image/svg+xml .svg
+AddType image/webp .webp
+
+# ============================================================
+# SECURITY - Block sensitive files
+# ============================================================
+<FilesMatch "\.(env|sh|sql|log|pid|toml|lock|git|htaccess)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block access to backend files
+<FilesMatch "(Cargo\.|\.rs$|\.toml$)">
     Order allow,deny
     Deny from all
 </FilesMatch>

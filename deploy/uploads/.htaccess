@@ -1,0 +1,51 @@
+# ============================================================
+# Barakah Foundation - Uploads Folder Security
+# Location: uploads/.htaccess
+# Purpose: Prevent execution of scripts in uploads folder
+# ============================================================
+
+# ============================================================
+# BLOCK SCRIPT EXECUTION
+# ============================================================
+# Block PHP execution
+<FilesMatch "\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block other executable types
+<FilesMatch "\.(cgi|pl|py|jsp|asp|aspx|sh|exe|bat|cmd)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# ============================================================
+# ALLOW SAFE FILE TYPES
+# ============================================================
+# Allow images
+<FilesMatch "\.(jpg|jpeg|png|gif|webp|svg|ico)$">
+    Order deny,allow
+    Allow from all
+</FilesMatch>
+
+# Allow documents
+<FilesMatch "\.(pdf|doc|docx|xls|xlsx|txt|zip)$">
+    Order deny,allow
+    Allow from all
+</FilesMatch>
+
+# ============================================================
+# PREVENT DIRECTORY LISTING
+# ============================================================
+Options -Indexes
+
+# ============================================================
+# SET CORRECT MIME TYPES
+# ============================================================
+AddType image/jpeg .jpg
+AddType image/jpeg .jpeg
+AddType image/png .png
+AddType image/gif .gif
+AddType image/webp .webp
+AddType image/svg+xml .svg
+AddType application/pdf .pdf
