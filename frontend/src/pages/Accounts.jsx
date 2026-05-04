@@ -80,7 +80,7 @@ export default function Accounts() {
     const isMember    = user?.role === "member";
     const isAdmin     = user?.role === "admin";
     const [data,      setData]      = useState([]);
-    const [summary,   setSummary]   = useState({ total_paid: 0, total_pending: 0, count: 0 });
+    const [summary,   setSummary]   = useState({ total_paid: 0, total_pending: 0, total_approved: 0, count: 0 });
     const [members,   setMembers]   = useState([]);
     const [banks,     setBanks]     = useState([]);
     const [loading,   setLoading]   = useState(true);
@@ -285,15 +285,15 @@ export default function Accounts() {
                     color="var(--danger)"
                 />
                 <StatCard
-                    label="মোট এন্ট্রি"
-                    value={summary.count || data.length}
-                    icon="trend_up"
+                    label="অনুমোদিত"
+                    value={fmtMoney(summary.total_approved)}
+                    icon="check_circle"
                     color="var(--primary)"
                 />
                 <StatCard
-                    label="সদস্য সংখ্যা"
-                    value={members.length}
-                    icon="members"
+                    label="মোট এন্ট্রি"
+                    value={summary.count || data.length}
+                    icon="trend_up"
                     color="var(--gold)"
                 />
             </StatsGrid>

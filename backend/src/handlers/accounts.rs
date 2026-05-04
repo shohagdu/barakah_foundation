@@ -133,22 +133,28 @@ pub async fn list(
 
     let deposits = q.fetch_all(db).await?;
 
-    // Summary
-    let total: f64 = deposits.iter()
-        .filter(|d| d.status.as_deref() == Some("paid"))
+    // Summary — categorize by payment status (not approval status)
+    let total_paid: f64 = deposits.iter()
+        .filter(|d| matches!(d.status.as_deref(), Some("paid")))
         .map(|d| f64::try_from(d.amount).unwrap_or(0.0))
         .sum();
 
-    let pending: f64 = deposits.iter()
-        .filter(|d| d.status.as_deref() != Some("paid"))
+    let total_unpaid: f64 = deposits.iter()
+        .filter(|d| matches!(d.status.as_deref(), Some("unpaid") | Some("partial") | Some("pending")))
+        .map(|d| f64::try_from(d.amount).unwrap_or(0.0))
+        .sum();
+
+    let total_approved: f64 = deposits.iter()
+        .filter(|d| matches!(d.status.as_deref(), Some("approved")))
         .map(|d| f64::try_from(d.amount).unwrap_or(0.0))
         .sum();
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "data": deposits,
         "summary": {
-            "total_paid":    total,
-            "total_pending": pending,
+            "total_paid":    total_paid,
+            "total_pending": total_unpaid,
+            "total_approved": total_approved,
             "count":         deposits.len()
         }
     })))
