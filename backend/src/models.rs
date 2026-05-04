@@ -6,36 +6,57 @@ use serde::{Deserialize, Serialize};
 // Member
 // ──────────────────────────────────────────────
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct Member {
-    pub id:         i64,
-    pub name:       String,
-    pub phone:      String,
-    pub email:      Option<String>,
-    pub address:    Option<String>,
-    pub category:   Option<String>,
-    pub status:     Option<String>,
-    pub join_date:  Option<NaiveDate>,
-    pub fee:        Option<Decimal>,
-    pub notes:      Option<String>,
+    pub id:                     i64,
+    pub name:                   String,
+    pub name_eng:               Option<String>,
+    pub phone:                  String,
+    pub address:                Option<String>,
+    pub category:               Option<String>,
+    pub status:                 Option<String>,
+    pub join_date:              Option<NaiveDate>,
+    pub fee:                    Option<Decimal>,
+    pub notes:                  Option<String>,
+    pub image:                  Option<String>,
+    pub nid_number:             Option<String>,
+    pub nid_attachment:         Option<String>,
+    pub nominee_image:          Option<String>,
+    pub nominee_name:           Option<String>,
+    pub nominee_mobile:         Option<String>,
+    pub nominee_nid_attachment: Option<String>,
+    pub nominee_address:        Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MemberPayload {
-    pub name:       String,
-    pub phone:      String,
-    pub email:      Option<String>,
-    pub address:    Option<String>,
-    pub category:   Option<String>,
-    pub status:     Option<String>,
-    #[serde(rename = "joinDate")]
-    pub join_date:  Option<NaiveDate>,
-    pub fee:        Option<Decimal>,
-    pub notes:      Option<String>,
+    pub name:                   String,
+    pub name_eng:               Option<String>,
+    pub phone:                  String,
+    pub address:                Option<String>,
+    pub category:               Option<String>,
+    pub status:                 Option<String>,
+    pub join_date:              Option<NaiveDate>,
+    pub fee:                    Option<Decimal>,
+    pub notes:                  Option<String>,
+    pub image:                  Option<String>,
+    pub nid_number:             Option<String>,
+    pub nid_attachment:         Option<String>,
+    pub nominee_image:          Option<String>,
+    pub nominee_name:           Option<String>,
+    pub nominee_mobile:         Option<String>,
+    pub nominee_nid_attachment: Option<String>,
+    pub nominee_address:        Option<String>,
+    // User account (only used on create — stored in users table)
+    pub email:                  Option<String>,
+    pub password:               Option<String>,
 }
 
 // ──────────────────────────────────────────────
 // Account
 // ──────────────────────────────────────────────
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow, Clone)]
 pub struct Account {
     pub id:          i64,
@@ -187,5 +208,6 @@ pub struct MeetingPayload {
 pub struct SearchQuery {
     pub search:      Option<String>,
     #[serde(rename = "type")]
+    #[allow(dead_code)]
     pub filter_type: Option<String>,
 }

@@ -1,8 +1,15 @@
 pub mod dashboard;
+pub mod settings;
 pub mod members;
+pub mod deposits;
+pub mod fines;
+pub mod reports;
 pub mod accounts;
 pub mod donations;
 pub mod projects;
 pub mod beneficiaries;
 pub mod meetings;
 pub mod auth_handler;
+pub mod upload;
+pub mod expenses;
+pub mod collections;

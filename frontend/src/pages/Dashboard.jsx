@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { getDashboard } from "../api.js";
-import { StatCard, Loader, fmtDate, fmtMoney, Badge } from "../components.jsx";
+import { StatCard, Loader, fmtDate, fmtMoney } from "../components.jsx";
 
 export default function Dashboard() {
   const [stats,   setStats]   = useState(null);
@@ -14,11 +14,10 @@ export default function Dashboard() {
   }, []);
 
   if (loading) return <Loader />;
-  if (error)   return (
+  if (error) return (
     <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "1.5rem", color: "var(--danger)" }}>
       <strong>সংযোগ ব্যর্থ হয়েছে</strong>
-      <p style={{ margin: "8px 0 0", fontSize: "0.875rem" }}>Rust backend চালু আছে কিনা চেক করুন: <code>http://127.0.0.1:8080/api/health</code></p>
-      <p style={{ margin: "4px 0 0", fontSize: "0.8rem", color: "var(--muted)" }}>{error}</p>
+      <p style={{ margin: "8px 0 0", fontSize: "0.875rem" }}>{error}</p>
     </div>
   );
 
@@ -46,17 +45,27 @@ export default function Dashboard() {
           <h3 style={{ margin: "0 0 1rem", fontSize: "1rem", fontWeight: 700, color: "var(--text)" }}>সাম্প্রতিক লেনদেন</h3>
           {!stats.recentTx?.length
             ? <p style={{ color: "var(--muted)", fontSize: "0.875rem" }}>কোনো লেনদেন নেই</p>
-            : stats.recentTx.map(t => (
-              <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: "1px solid var(--border)" }}>
-                <div>
-                  <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)" }}>{t.description}</div>
-                  <div style={{ fontSize: "0.72rem", color: "var(--muted)" }}>{fmtDate(t.date)} · {t.category || "—"}</div>
-                </div>
-                <span style={{ fontWeight: 700, fontSize: "0.9rem", color: t.txType === "income" ? "var(--success)" : "var(--danger)" }}>
-                  {t.txType === "income" ? "+" : "-"}{fmtMoney(t.amount)}
-                </span>
-              </div>
-            ))
+            : stats.recentTx.map(t => {
+                const isIncome  = t.txType === "income";
+                const isExpense = t.txType === "expense";
+                const color  = isIncome ? "var(--success)" : isExpense ? "var(--danger)" : "var(--primary)";
+                const prefix = isIncome ? "+" : isExpense ? "-" : "";
+                return (
+                  <div key={t.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
+                    <div style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+                      <div style={{ fontSize: "0.875rem", fontWeight: 600, color: "var(--text)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {t.description || t.reference || "—"}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginTop: 2 }}>
+                        {fmtDate(t.date)}{t.accounts ? ` · ${t.accounts}` : ""}
+                      </div>
+                    </div>
+                    <span style={{ fontWeight: 700, fontSize: "0.9rem", flexShrink: 0, color }}>
+                      {prefix}{fmtMoney(t.amount)}
+                    </span>
+                  </div>
+                );
+              })
           }
         </div>
 
@@ -64,21 +73,16 @@ export default function Dashboard() {
         <div style={{ background: "var(--card)", borderRadius: 14, padding: "1.25rem", border: "1px solid var(--border)" }}>
           <h3 style={{ margin: "0 0 1rem", fontSize: "1rem", fontWeight: 700, color: "var(--text)" }}>আর্থিক সারসংক্ষেপ</h3>
           {[
-            { l: "মোট আয়",           v: stats.income,         c: "var(--success)" },
-            { l: "মোট ব্যয়",          v: stats.expense,        c: "var(--danger)"  },
-            { l: "নিট ব্যালেন্স",     v: stats.balance,        c: "var(--gold)"    },
-            { l: "মোট দান সংগ্রহ",   v: stats.totalDonations, c: "#8b5cf6"        },
+            { l: "মোট আয়",         v: stats.income,         c: "var(--success)" },
+            { l: "মোট ব্যয়",        v: stats.expense,        c: "var(--danger)"  },
+            { l: "নিট ব্যালেন্স",   v: stats.balance,        c: "var(--gold)"    },
+            { l: "মোট দান সংগ্রহ", v: stats.totalDonations, c: "#8b5cf6"        },
           ].map(row => (
             <div key={row.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid var(--border)" }}>
               <span style={{ fontSize: "0.875rem", color: "var(--muted)" }}>{row.l}</span>
               <span style={{ fontWeight: 700, color: row.c, fontSize: "0.95rem" }}>{fmtMoney(row.v)}</span>
             </div>
           ))}
-
-          <div style={{ marginTop: "1rem", padding: "12px", background: "var(--bg)", borderRadius: "10px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <span style={{ fontSize: "0.8rem", color: "var(--muted)", fontWeight: 600 }}>ব্যাকএন্ড</span>
-            <Badge color="var(--success)">Rust · Actix-Web</Badge>
-          </div>
         </div>
 
       </div>

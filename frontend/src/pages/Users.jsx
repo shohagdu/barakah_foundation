@@ -7,14 +7,20 @@ import { Modal, Field, Input, Select, Btn, StatCard, Table, Badge,
          Toast, PageHeader, StatsGrid, useToast } from "../components.jsx";
 import { ROLES } from "../auth.js";
 
-const BASE = "/api/auth";
+const BASE = "/api";
 
 const authFetch = async (url, opts = {}) => {
   const res = await fetch(url, {
     ...opts,
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}`, ...opts.headers },
   });
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(`Server returned non-JSON response (HTTP ${res.status})`);
+  }
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 };

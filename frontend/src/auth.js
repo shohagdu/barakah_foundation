@@ -46,7 +46,7 @@ export const apiRegister = (payload) =>
   authReq(`${BASE}/register`, payload);
 
 export const apiMe = async () => {
-  const res = await fetch("/api/auth/me", {
+  const res = await fetch("/api/me", {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok) throw new Error("Session expired");
