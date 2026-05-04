@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getStoredUser } from "../auth.js";
 import {
   getChartOfAccounts, createChartOfAccount, updateChartOfAccount, deleteChartOfAccount,
+  approveChartOfAccount,
   getSettingsBanks, createSettingsBank, updateSettingsBank, deleteSettingsBank,
   getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
 } from "../api.js";
@@ -13,6 +15,9 @@ import {
 const TYPE_LABEL = { asset: "সম্পদ", liability: "দায়", equity: "মূলধন", income: "আয়", expense: "ব্যয়" };
 const TYPE_COLOR = { asset: "var(--primary)", liability: "var(--gold)", equity: "#8b5cf6", income: "var(--success)", expense: "var(--danger)" };
 
+const STATUS_LABEL = { pending: "অপেক্ষমাণ", approved: "অনুমোদিত" };
+const STATUS_COLOR = { pending: "var(--gold)", approved: "var(--success)" };
+
 // ── Chart of Accounts ────────────────────────────────────────
 function ChartOfAccounts() {
   const [data,   setData]   = useState([]);
@@ -21,6 +26,8 @@ function ChartOfAccounts() {
   const [form,   setForm]   = useState({});
   const [saving, setSaving] = useState(false);
   const [toast,  showToast] = useToast();
+  const user = getStoredUser();
+  const isAdmin = user?.role === "admin";
 
   const load = useCallback(async () => {
     try { setLoading(true); setData(await getChartOfAccounts()); }
@@ -53,6 +60,16 @@ function ChartOfAccounts() {
     catch (e) { showToast(e.message, "error"); }
   };
 
+  const handleApprove = async id => {
+    try {
+      await approveChartOfAccount(id);
+      showToast("অনুমোদিত হয়েছে ✓");
+      load();
+    } catch (e) {
+      showToast(e.message, "error");
+    }
+  };
+
   return (
     <div>
       <Toast toast={toast} />
@@ -66,7 +83,30 @@ function ChartOfAccounts() {
           { key: "accountCode", label: "কোড" },
           { key: "type",        label: "ধরন",   render: r => <Badge color={TYPE_COLOR[r.type] || "var(--primary)"}>{TYPE_LABEL[r.type] || r.type}</Badge> },
           { key: "category",    label: "বিভাগ" },
+          { key: "status",      label: "অবস্থা", render: r => <Badge color={STATUS_COLOR[r.status] || "var(--muted)"}>{STATUS_LABEL[r.status] || r.status || "—"}</Badge> },
           { key: "description", label: "বিবরণ" },
+          ...(isAdmin ? [{
+            key: "actions",
+            label: "পদক্ষেপ",
+            render: r => r.status === "pending" ? (
+              <Btn
+                size="sm"
+                onClick={() => handleApprove(r.id)}
+                style={{
+                  padding: "4px 12px",
+                  fontSize: "0.75rem",
+                  background: "var(--success)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 4,
+                  cursor: "pointer",
+                  fontWeight: 600,
+                }}
+              >
+                অনুমোদন করুন
+              </Btn>
+            ) : null,
+          }] : []),
         ]}
         rows={data}
         onEdit={handleDelete && openEdit}

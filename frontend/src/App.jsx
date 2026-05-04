@@ -26,7 +26,7 @@ import { Donations, Projects, Beneficiaries, Meetings } from "./pages/Modules.js
 const NAV = [
   { path: "/dashboard",          label: "ড্যাশবোর্ড",      icon: "dashboard", roles: ["admin","accountant","member","viewer"] },
   { path: "/members",            label: "সদস্য",            icon: "members",   roles: ["admin","accountant"] },
-  { path: "/accounts",            label: "হিসাব",             icon: "accounts",  roles: ["admin","accountant"] },
+  { path: "/accounts",            label: "হিসাব",             icon: "accounts",  roles: ["admin","accountant","member"] },
   { path: "/collections",         label: "বিশেষ সংগ্রহ",     icon: "money_in",  roles: ["admin","accountant"] },
   { path: "/projects",           label: "প্রকল্প",           icon: "projects",  roles: ["admin","accountant","viewer"] },
   { path: "/meetings",           label: "মিটিং",             icon: "meetings",  roles: ["admin","accountant","viewer"] },
