@@ -138,6 +138,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/settings/chart-of-accounts",      web::post().to(handlers::settings::coa_create))
                     .route("/settings/chart-of-accounts/{id}", web::put().to(handlers::settings::coa_update))
                     .route("/settings/chart-of-accounts/{id}", web::delete().to(handlers::settings::coa_delete))
+                    .route("/settings/chart-of-accounts/{id}/approve", web::post().to(handlers::settings::coa_approve))
 
                     // Settings — Bank Accounts
                     .route("/settings/bank-accounts",      web::get().to(handlers::settings::bank_list))

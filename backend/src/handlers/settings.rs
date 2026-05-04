@@ -14,6 +14,7 @@ pub struct ChartAccount {
     pub account_type: String,
     pub category:     Option<String>,
     pub description:  Option<String>,
+    pub status:       Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -28,8 +29,8 @@ pub struct ChartAccountPayload {
 
 pub async fn coa_list(pool: web::Data<MySqlPool>) -> Result<HttpResponse, AppError> {
     let rows: Vec<ChartAccount> = sqlx::query_as(
-        "SELECT id, account_code, type AS account_type, category, description
-         FROM accounts ORDER BY created_at DESC, id DESC"
+        "SELECT id, account_code, type AS account_type, category, description, status
+         FROM accounts ORDER BY status DESC, created_at DESC, id DESC"
     )
     .fetch_all(pool.get_ref())
     .await?;
@@ -52,7 +53,7 @@ pub async fn coa_create(
     .await?;
 
     let created: ChartAccount = sqlx::query_as(
-        "SELECT id, account_code, type AS account_type, category, description
+        "SELECT id, account_code, type AS account_type, category, description, status
          FROM accounts WHERE id = ?"
     )
     .bind(res.last_insert_id() as i64)
@@ -79,7 +80,7 @@ pub async fn coa_update(
     .await?;
 
     let updated: ChartAccount = sqlx::query_as(
-        "SELECT id, account_code, type AS account_type, category, description
+        "SELECT id, account_code, type AS account_type, category, description, status
          FROM accounts WHERE id = ?"
     )
     .bind(*id)
@@ -97,6 +98,25 @@ pub async fn coa_delete(
         .execute(pool.get_ref())
         .await?;
     Ok(HttpResponse::Ok().json(serde_json::json!({ "ok": true })))
+}
+
+pub async fn coa_approve(
+    pool: web::Data<MySqlPool>,
+    id:   web::Path<i64>,
+) -> Result<HttpResponse, AppError> {
+    sqlx::query!("UPDATE accounts SET status = 'approved' WHERE id = ?", *id)
+        .execute(pool.get_ref())
+        .await?;
+
+    let updated: ChartAccount = sqlx::query_as(
+        "SELECT id, account_code, type AS account_type, category, description, status
+         FROM accounts WHERE id = ?"
+    )
+    .bind(*id)
+    .fetch_one(pool.get_ref())
+    .await?;
+
+    Ok(HttpResponse::Ok().json(updated))
 }
 
 // ── Bank Accounts ────────────────────────────────────────────
