@@ -7,6 +7,7 @@ pub enum AppError {
     Database(SqlxError),
     NotFound(String),
     BadRequest(String),
+    Internal(String),
 }
 
 impl fmt::Display for AppError {
@@ -15,6 +16,7 @@ impl fmt::Display for AppError {
             AppError::Database(e)    => write!(f, "Database error: {}", e),
             AppError::NotFound(m)    => write!(f, "Not found: {}", m),
             AppError::BadRequest(m)  => write!(f, "Bad request: {}", m),
+            AppError::Internal(m)    => write!(f, "Internal error: {}", m),
         }
     }
 }
@@ -24,6 +26,10 @@ impl ResponseError for AppError {
         match self {
             AppError::NotFound(m)   => HttpResponse::NotFound().json(serde_json::json!({ "error": m })),
             AppError::BadRequest(m) => HttpResponse::BadRequest().json(serde_json::json!({ "error": m })),
+            AppError::Internal(m)   => {
+                log::error!("Internal error: {}", m);
+                HttpResponse::InternalServerError().json(serde_json::json!({ "error": m }))
+            }
             AppError::Database(e)   => {
                 log::error!("DB error: {:?}", e);
                 HttpResponse::InternalServerError().json(serde_json::json!({ "error": "Database error" }))
@@ -38,6 +44,18 @@ impl From<SqlxError> for AppError {
             SqlxError::RowNotFound => AppError::NotFound("Record not found".into()),
             _ => AppError::Database(e),
         }
+    }
+}
+
+impl From<zip::result::ZipError> for AppError {
+    fn from(e: zip::result::ZipError) -> Self {
+        AppError::Internal(format!("Zip error: {}", e))
+    }
+}
+
+impl From<std::io::Error> for AppError {
+    fn from(e: std::io::Error) -> Self {
+        AppError::Internal(format!("IO error: {}", e))
     }
 }
 

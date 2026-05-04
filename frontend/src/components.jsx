@@ -28,6 +28,9 @@ const PATHS = {
   trend_up:    "M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z",
   warning:     "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
   check:       "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  reports:     "M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z",
+  expense:     "M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z",
+  settings:    "M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z",
 };
 
 export const Icon = ({ name, size = 18 }) => (
@@ -150,8 +153,9 @@ export const Badge = ({ children, color = "var(--primary)" }) => (
 );
 
 // ── Table ──────────────────────────────────────────────────
-export const Table = ({ cols, rows, onEdit, onDelete, loading }) => {
+export const Table = ({ cols, rows, onEdit, onView, onDelete, loading }) => {
   if (loading) return <Loader />;
+  const hasActions = onEdit || onView || onDelete;
   return (
     <div style={{ overflowX: "auto", borderRadius: "12px", border: "1px solid var(--border)" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.875rem" }}>
@@ -160,7 +164,7 @@ export const Table = ({ cols, rows, onEdit, onDelete, loading }) => {
             {cols.map(c => (
               <th key={c.key} style={{ padding: "10px 14px", textAlign: "left", fontWeight: 700, color: "var(--muted)", fontSize: "0.7rem", textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: "1px solid var(--border)", whiteSpace: "nowrap" }}>{c.label}</th>
             ))}
-            {(onEdit || onDelete) && <th style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", width: 80 }} />}
+            {hasActions && <th style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)", width: 100 }} />}
           </tr>
         </thead>
         <tbody>
@@ -176,10 +180,11 @@ export const Table = ({ cols, rows, onEdit, onDelete, loading }) => {
                     {c.render ? c.render(row) : (row[c.key] ?? "—")}
                   </td>
                 ))}
-                {(onEdit || onDelete) && (
+                {hasActions && (
                   <td style={{ padding: "6px 10px" }}>
                     <div style={{ display: "flex", gap: "2px" }}>
-                      {onEdit   && <button onClick={() => onEdit(row)}   style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", padding: "5px", borderRadius: "6px", display: "flex" }}><Icon name="edit"   size={14} /></button>}
+                      {onEdit   && <button onClick={() => onEdit(row)}      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", padding: "5px", borderRadius: "6px", display: "flex" }}><Icon name="edit"   size={14} /></button>}
+                      {onView   && <button onClick={() => onView(row)}      style={{ background: "none", border: "none", cursor: "pointer", color: "var(--gold)",    padding: "5px", borderRadius: "6px", display: "flex", fontSize: "0.75rem", fontWeight: 700 }}>বিস্তারিত</button>}
                       {onDelete && <button onClick={() => onDelete(row.id)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)",  padding: "5px", borderRadius: "6px", display: "flex" }}><Icon name="delete" size={14} /></button>}
                     </div>
                   </td>
@@ -228,10 +233,10 @@ export const FormGrid = ({ children }) => (
 );
 
 // ── FormActions ────────────────────────────────────────────
-export const FormActions = ({ onCancel, saving }) => (
+export const FormActions = ({ onCancel, onSubmit, saving }) => (
   <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "4px" }}>
     <Btn variant="muted" onClick={onCancel} type="button">বাতিল</Btn>
-    <Btn icon="save" loading={saving} type="submit">সংরক্ষণ</Btn>
+    <Btn icon="save" onClick={onSubmit} loading={saving} type={onSubmit ? "button" : "submit"}>সংরক্ষণ</Btn>
   </div>
 );
 

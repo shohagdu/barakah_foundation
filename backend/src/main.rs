@@ -5,6 +5,7 @@ mod errors;
 mod auth;
 
 use actix_cors::Cors;
+use actix_files;
 use actix_web::{web, App, HttpServer, middleware::Logger};
 use actix_web_httpauth::middleware::HttpAuthentication;
 use dotenvy::dotenv;
@@ -39,6 +40,7 @@ async fn main() -> std::io::Result<()> {
             .wrap(cors)
             .wrap(Logger::default())
             .app_data(pool_data.clone())
+            .service(actix_files::Files::new("/uploads", "./uploads"))
             .app_data(web::JsonConfig::default().error_handler(|err, _| {
                 let msg = err.to_string();
                 actix_web::error::InternalError::from_response(
@@ -60,11 +62,14 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api")
                     .wrap(jwt_mw)
 
+                    // File upload
+                    .route("/upload", web::post().to(handlers::upload::upload))
+
                     // Auth
-                    .route("/auth/me",        web::get().to(handlers::auth_handler::me))
-                    .route("/auth/users",      web::get().to(handlers::auth_handler::list_users))
-                    .route("/auth/users/{id}", web::put().to(handlers::auth_handler::update_user))
-                    .route("/auth/users/{id}", web::delete().to(handlers::auth_handler::delete_user))
+                    .route("/me",        web::get().to(handlers::auth_handler::me))
+                    .route("/users",      web::get().to(handlers::auth_handler::list_users))
+                    .route("/users/{id}", web::put().to(handlers::auth_handler::update_user))
+                    .route("/users/{id}", web::delete().to(handlers::auth_handler::delete_user))
 
                     // Dashboard
                     .route("/dashboard", web::get().to(handlers::dashboard::summary))
@@ -75,6 +80,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/members/{id}", web::get().to(handlers::members::get_one))
                     .route("/members/{id}", web::put().to(handlers::members::update))
                     .route("/members/{id}", web::delete().to(handlers::members::delete))
+                    .route("/members/download/attachments", web::get().to(handlers::members::download_all_attachments))
 
                     // Accounts
                     .route("/accounts",             web::get().to(handlers::accounts::list))
@@ -108,6 +114,61 @@ async fn main() -> std::io::Result<()> {
                     .route("/meetings/{id}", web::get().to(handlers::meetings::get_one))
                     .route("/meetings/{id}", web::put().to(handlers::meetings::update))
                     .route("/meetings/{id}", web::delete().to(handlers::meetings::delete))
+
+                    // Member Deposits
+                    .route("/member-deposits/summary", web::get().to(handlers::deposits::summary))
+                    .route("/member-deposits/unpaid",  web::get().to(handlers::deposits::unpaid))
+                    .route("/member-report",            web::get().to(handlers::deposits::member_report))
+                    .route("/member-wise-report",      web::get().to(handlers::deposits::member_wise_report))
+
+                    // Member Fines
+                    .route("/member-fines",         web::get().to(handlers::fines::list))
+                    .route("/member-fines",         web::post().to(handlers::fines::create))
+                    .route("/member-fines/{id}/pay",web::put().to(handlers::fines::pay))
+
+                    // Reports
+                    .route("/reports/profit-loss",   web::get().to(handlers::reports::profit_loss))
+                    .route("/reports/cash-flow",     web::get().to(handlers::reports::cash_flow))
+                    .route("/reports/balance-sheet", web::get().to(handlers::reports::balance_sheet))
+                    .route("/reports/trial-balance", web::get().to(handlers::reports::trial_balance))
+                    .route("/reports/bank-statement", web::get().to(handlers::reports::bank_statement))
+
+                    // Settings — Chart of Accounts
+                    .route("/settings/chart-of-accounts",      web::get().to(handlers::settings::coa_list))
+                    .route("/settings/chart-of-accounts",      web::post().to(handlers::settings::coa_create))
+                    .route("/settings/chart-of-accounts/{id}", web::put().to(handlers::settings::coa_update))
+                    .route("/settings/chart-of-accounts/{id}", web::delete().to(handlers::settings::coa_delete))
+
+                    // Settings — Bank Accounts
+                    .route("/settings/bank-accounts",      web::get().to(handlers::settings::bank_list))
+                    .route("/settings/bank-accounts",      web::post().to(handlers::settings::bank_create))
+                    .route("/settings/bank-accounts/{id}", web::put().to(handlers::settings::bank_update))
+                    .route("/settings/bank-accounts/{id}", web::delete().to(handlers::settings::bank_delete))
+
+                    // Expense Categories
+                    .route("/expense-categories",      web::get().to(handlers::expenses::cat_list))
+                    .route("/expense-categories",      web::post().to(handlers::expenses::cat_create))
+                    .route("/expense-categories/{id}", web::put().to(handlers::expenses::cat_update))
+                    .route("/expense-categories/{id}", web::delete().to(handlers::expenses::cat_delete))
+
+                    // Expenses
+                    .route("/expenses/summary",        web::get().to(handlers::expenses::summary))
+                    .route("/expenses",                web::get().to(handlers::expenses::list))
+                    .route("/expenses",                web::post().to(handlers::expenses::create))
+                    .route("/expenses/{id}",           web::get().to(handlers::expenses::get_one))
+                    .route("/expenses/{id}",           web::put().to(handlers::expenses::update))
+                    .route("/expenses/{id}",           web::delete().to(handlers::expenses::delete))
+                    .route("/expenses/{id}/approve",   web::post().to(handlers::expenses::approve))
+                    .route("/expenses/{id}/reject",    web::post().to(handlers::expenses::reject))
+
+                    // Expense Reports
+                    .route("/reports/expense-summary", web::get().to(handlers::expenses::report_summary))
+                    .route("/reports/expense-detail",  web::get().to(handlers::expenses::report_detail))
+
+                    // Collections (ad-hoc member collections)
+                    .route("/collections",      web::get().to(handlers::collections::list))
+                    .route("/collections",      web::post().to(handlers::collections::create))
+                    .route("/collections/{id}", web::delete().to(handlers::collections::delete))
             )
     })
     .bind((host, port))?
