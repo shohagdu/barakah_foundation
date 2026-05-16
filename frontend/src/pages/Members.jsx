@@ -58,7 +58,7 @@ export default function Members() {
   const handleDownloadAttachments = async () => {
     try {
       const token = getToken();
-      const res = await fetch("/api/members/download/attachments", {
+      const res = await fetch(`${import.meta.env.VITE_API_BASE || "/api"}/members/download/attachments`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

@@ -7,7 +7,7 @@ import { Modal, Field, Input, Select, Btn, StatCard, Table, Badge,
          Toast, PageHeader, StatsGrid, useToast } from "../components.jsx";
 import { ROLES } from "../auth.js";
 
-const BASE = "/api";
+const BASE = import.meta.env.VITE_API_BASE || "/api";
 
 const authFetch = async (url, opts = {}) => {
   const res = await fetch(url, {

@@ -121,6 +121,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/member-deposits/unpaid",  web::get().to(handlers::deposits::unpaid))
                     .route("/member-report",            web::get().to(handlers::deposits::member_report))
                     .route("/member-wise-report",      web::get().to(handlers::deposits::member_wise_report))
+                    .route("/member-summary-report",   web::get().to(handlers::deposits::member_summary_report))
 
                     // Member Fines
                     .route("/member-fines",         web::get().to(handlers::fines::list))

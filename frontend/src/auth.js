@@ -26,7 +26,8 @@ export const getStoredUser = () => {
 export const isLoggedIn = () => !!getToken();
 
 // ── API calls ─────────────────────────────────────────────
-const BASE = "/api/auth";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const BASE     = `${API_BASE}/auth`;
 
 const authReq = async (url, body) => {
   const res = await fetch(url, {
@@ -46,7 +47,7 @@ export const apiRegister = (payload) =>
   authReq(`${BASE}/register`, payload);
 
 export const apiMe = async () => {
-  const res = await fetch("/api/me", {
+  const res = await fetch(`${API_BASE}/me`, {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok) throw new Error("Session expired");

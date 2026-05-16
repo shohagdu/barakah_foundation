@@ -1,0 +1,16 @@
+# Barakah Foundation — Main .htaccess
+# Location: public_html/barakah_foundation/.htaccess
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /barakah_foundation/
+
+  # Skip api/ — physical directory handles itself
+  RewriteCond %{REQUEST_URI} ^/barakah_foundation/api/
+  RewriteRule ^ - [L]
+
+  # React SPA — non-existent paths → index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule ^ index.html [L]
+</IfModule>

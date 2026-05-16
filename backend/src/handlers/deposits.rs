@@ -4,6 +4,7 @@ use serde_json::json;
 use sqlx::MySqlPool;
 use rust_decimal::Decimal;
 use chrono::NaiveDate;
+use std::collections::{HashMap, HashSet};
 use crate::errors::AppError;
 use crate::handlers::collections::member_collections;
 
@@ -340,5 +341,93 @@ pub async fn member_wise_report(
         "totalUnpaid":      total_unpaid,
         "collections":      collections,
         "totalCollections": total_collections,
+    })))
+}
+
+// ── Member Overall Summary Report ─────────────────────────────
+#[derive(Debug, sqlx::FromRow)]
+struct MemberNameRow {
+    id:   i64,
+    name: Option<String>,
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct MonthlyDepositRow {
+    member_id:     i64,
+    deposit_month: String,
+    total:         Decimal,
+}
+
+pub async fn member_summary_report(
+    pool:  web::Data<MySqlPool>,
+    query: web::Query<SummaryQuery>,
+) -> Result<HttpResponse, AppError> {
+    let db   = pool.get_ref();
+    let from = query.from_month.as_deref().unwrap_or("1970-01");
+    let to   = query.to_month.as_deref().unwrap_or("9999-12");
+
+    let members: Vec<MemberNameRow> = sqlx::query_as(
+        "SELECT id, name FROM members ORDER BY name"
+    ).fetch_all(db).await?;
+
+    let deposits: Vec<MonthlyDepositRow> = sqlx::query_as(
+        "SELECT member_id, deposit_month, COALESCE(SUM(amount), 0) AS total
+         FROM member_deposits
+         WHERE deposit_month BETWEEN ? AND ?
+         GROUP BY member_id, deposit_month
+         ORDER BY deposit_month"
+    )
+    .bind(from).bind(to)
+    .fetch_all(db).await?;
+
+    let months: Vec<String> = {
+        let mut seen = HashSet::new();
+        let mut v: Vec<String> = Vec::new();
+        for d in &deposits {
+            if seen.insert(d.deposit_month.clone()) {
+                v.push(d.deposit_month.clone());
+            }
+        }
+        v.sort();
+        v
+    };
+
+    let mut lookup: HashMap<(i64, String), f64> = HashMap::new();
+    for d in &deposits {
+        let amt: f64 = d.total.try_into().unwrap_or(0.0);
+        lookup.insert((d.member_id, d.deposit_month.clone()), amt);
+    }
+
+    let member_rows: Vec<serde_json::Value> = members.iter().map(|m| {
+        let monthly: HashMap<&str, f64> = months.iter()
+            .map(|mo| (mo.as_str(), *lookup.get(&(m.id, mo.clone())).unwrap_or(&0.0)))
+            .collect();
+
+        let total: f64 = months.iter()
+            .map(|mo| *lookup.get(&(m.id, mo.clone())).unwrap_or(&0.0))
+            .sum();
+
+        json!({
+            "memberId":   m.id,
+            "memberName": m.name,
+            "monthly":    monthly,
+            "total":      total,
+        })
+    }).collect();
+
+    let col_totals: HashMap<&str, f64> = months.iter().map(|mo| {
+        let sum: f64 = members.iter()
+            .map(|m| *lookup.get(&(m.id, mo.clone())).unwrap_or(&0.0))
+            .sum();
+        (mo.as_str(), sum)
+    }).collect();
+
+    let grand_total: f64 = col_totals.values().sum();
+
+    Ok(HttpResponse::Ok().json(json!({
+        "months":     months,
+        "members":    member_rows,
+        "colTotals":  col_totals,
+        "grandTotal": grand_total,
     })))
 }

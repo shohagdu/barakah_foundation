@@ -109,7 +109,8 @@ export const getReportCashFlow     = (from, to)   => api.get(`/reports/cash-flow
 export const getReportBalanceSheet = ()           => api.get("/reports/balance-sheet");
 export const getReportTrialBalance = ()           => api.get("/reports/trial-balance");
 export const getMemberReport       = (p={})       => api.get(`/member-report${qs(p)}`);
-export const getMemberWiseReport   = (p={})       => api.get(`/member-wise-report${qs(p)}`);
+export const getMemberWiseReport      = (p={})  => api.get(`/member-wise-report${qs(p)}`);
+export const getMemberSummaryReport   = (p={})  => api.get(`/member-summary-report${qs(p)}`);
 export const getDepositSummary     = (p={})       => api.get(`/member-deposits/summary${qs(p)}`);
 export const getUnpaidDeposits     = ()           => api.get("/member-deposits/unpaid");
 export const getMemberFines        = (p={})       => api.get(`/member-fines${qs(p)}`);

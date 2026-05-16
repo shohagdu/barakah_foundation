@@ -1,0 +1,24 @@
+# Barakah Foundation — API Proxy .htaccess
+# Location: public_html/barakah_foundation/api/.htaccess
+
+# ── Disable ModSecurity WAF for API (blocks login POST requests) ──
+<IfModule mod_security.c>
+  SecRuleEngine Off
+  SecRequestBodyAccess Off
+</IfModule>
+<IfModule mod_security2.c>
+  SecRuleEngine Off
+  SecRequestBodyAccess Off
+</IfModule>
+<IfModule LiteSpeed>
+  SecRuleEngine Off
+</IfModule>
+
+# ── Route everything to index.php ─────────────────────────────
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /barakah_foundation/api/
+
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteRule ^ index.php [L]
+</IfModule>

@@ -12,7 +12,8 @@ import Settings     from "./pages/Settings.jsx";
 import Reports          from "./pages/Reports.jsx";
 import MemberReport     from "./pages/MemberReport.jsx";
 import MemberWiseReport    from "./pages/MemberWiseReport.jsx";
-import MemberSummaryReport from "./pages/MemberSummaryReport.jsx";
+import MemberSummaryReport        from "./pages/MemberSummaryReport.jsx";
+import MemberOverallSummaryReport from "./pages/MemberOverallSummaryReport.jsx";
 import BankStatement        from "./pages/BankStatement.jsx";
 import Collections          from "./pages/Collections.jsx";
 import Expenses            from "./pages/Expenses.jsx";
@@ -35,7 +36,8 @@ const NAV = [
   { path: "/reports",            label: "হিসাব রিপোর্ট",    icon: "reports",   roles: ["admin","accountant","member"] },
   { path: "/member-report",      label: "সদস্য রিপোর্ট",    icon: "members",   roles: ["admin","accountant","member"] },
   { path: "/member-wise-report",    label: "সদস্য রশিদ",         icon: "reports",   roles: ["admin","accountant","member"] },
-  { path: "/member-summary-report", label: "চাঁদা সারসংক্ষেপ",  icon: "reports",   roles: ["admin","accountant","member"] },
+  { path: "/member-summary-report",         label: "চাঁদা সারসংক্ষেপ",       icon: "reports", roles: ["admin","accountant","member"] },
+  { path: "/member-overall-summary-report", label: "সার্বিক চাঁদা প্রতিবেদন", icon: "reports", roles: ["admin","accountant","member"] },
   { path: "/reports/expenses",        label: "খরচ রিপোর্ট",        icon: "expense",   roles: ["admin","accountant","member"] },
   { path: "/reports/bank-statement",  label: "ব্যাংক স্টেটমেন্ট",  icon: "accounts",  roles: ["admin","accountant","member"] },
   // ── Expense
@@ -192,7 +194,8 @@ function AppLayout({ user, onLogout }) {
             <Route path="/reports/*"        element={<Reports />} />
             <Route path="/member-report"      element={<MemberReport />} />
             <Route path="/member-wise-report"    element={<MemberWiseReport />} />
-            <Route path="/member-summary-report" element={<MemberSummaryReport />} />
+            <Route path="/member-summary-report"         element={<MemberSummaryReport />} />
+            <Route path="/member-overall-summary-report" element={<MemberOverallSummaryReport />} />
             <Route path="/expenses"              element={<Expenses />} />
             <Route path="/expenses/new"          element={<ExpenseForm />} />
             <Route path="/expenses/:id/edit"     element={<ExpenseForm />} />
