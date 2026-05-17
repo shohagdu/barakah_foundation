@@ -2,17 +2,9 @@
 // Login & Register Page
 // ================================================================
 import { useState } from "react";
-import { apiLogin, apiRegister, saveAuth } from "../auth.js";
-
-const ROLES = [
-  { value: "admin",      label: "অ্যাডমিন"    },
-  { value: "accountant", label: "হিসাবরক্ষক"  },
-  { value: "member",     label: "সদস্য"        },
-  { value: "viewer",     label: "দর্শক"        },
-];
+import { apiLogin, saveAuth } from "../auth.js";
 
 export default function Login({ onAuth }) {
-  const [tab,    setTab]    = useState("login");
   const [form,   setForm]   = useState({});
   const [error,  setError]  = useState("");
   const [loading,setLoading]= useState(false);
@@ -26,31 +18,6 @@ export default function Login({ onAuth }) {
     try {
       setLoading(true);
       const res = await apiLogin(form.email, form.password);
-      saveAuth(res.token, res.user);
-      onAuth(res.user);
-    } catch (err) {
-      setError(err.message);
-    } finally { setLoading(false); }
-  };
-
-  const handleRegister = async e => {
-    e.preventDefault();
-    setError("");
-    if (!form.name || !form.email || !form.password)
-      return setError("নাম, ইমেইল ও পাসওয়ার্ড আবশ্যক");
-    if (form.password.length < 6)
-      return setError("পাসওয়ার্ড কমপক্ষে ৬ অক্ষর হতে হবে");
-    if (form.password !== form.confirm)
-      return setError("পাসওয়ার্ড মিলছে না");
-    try {
-      setLoading(true);
-      const res = await apiRegister({
-        name:     form.name,
-        email:    form.email,
-        password: form.password,
-        mobile:   form.mobile || null,
-        role:     form.role   || "member",
-      });
       saveAuth(res.token, res.user);
       onAuth(res.user);
     } catch (err) {
@@ -96,21 +63,6 @@ export default function Login({ onAuth }) {
           overflow: "hidden",
         }}>
 
-          {/* Tabs */}
-          <div style={{ display: "flex", borderBottom: "1px solid var(--border)" }}>
-            {[{ id: "login", label: "লগইন" }, { id: "register", label: "নতুন নিবন্ধন" }].map(t => (
-              <button key={t.id} onClick={() => { setTab(t.id); setError(""); setForm({}); }}
-                style={{
-                  flex: 1, padding: "14px", border: "none", cursor: "pointer",
-                  fontFamily: "inherit", fontSize: "0.9rem", fontWeight: 700,
-                  transition: "all .15s",
-                  background: tab === t.id ? "var(--card)" : "var(--bg)",
-                  color: tab === t.id ? "var(--primary)" : "var(--muted)",
-                  borderBottom: tab === t.id ? "2px solid var(--primary)" : "2px solid transparent",
-                }}>{t.label}</button>
-            ))}
-          </div>
-
           <div style={{ padding: "1.75rem" }}>
 
             {/* Error */}
@@ -126,79 +78,30 @@ export default function Login({ onAuth }) {
               </div>
             )}
 
-            {/* ── LOGIN FORM ── */}
-            {tab === "login" && (
-              <form onSubmit={handleLogin}>
-                <div style={{ marginBottom: "1rem" }}>
-                  <label style={labelStyle}>ইমেইল ঠিকানা</label>
-                  <input
-                    type="email" required value={form.email || ""} onChange={set("email")}
-                    placeholder="your@email.com"
-                    style={inputStyle}
-                  />
-                </div>
-                <div style={{ marginBottom: "1.5rem" }}>
-                  <label style={labelStyle}>পাসওয়ার্ড</label>
-                  <input
-                    type="password" required value={form.password || ""} onChange={set("password")}
-                    placeholder="••••••••"
-                    style={inputStyle}
-                  />
-                </div>
-                <button type="submit" disabled={loading} style={btnStyle}>
-                  {loading ? "লগইন হচ্ছে..." : "🔐 লগইন করুন"}
-                </button>
-
-                {/* Default credentials hint */}
-                <div style={{ marginTop: "1.25rem", padding: "10px 12px", background: "var(--bg)", borderRadius: 8, fontSize: "0.75rem", color: "var(--muted)", lineHeight: 1.7 }}>
-                  <strong style={{ color: "var(--primary)" }}>ডিফল্ট অ্যাডমিন:</strong><br />
-                  📧 admin@barakah.org &nbsp;|&nbsp; 🔑 Admin@1234
-                </div>
-              </form>
-            )}
-
-            {/* ── REGISTER FORM ── */}
-            {tab === "register" && (
-              <form onSubmit={handleRegister}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1rem" }}>
-                  <div style={{ marginBottom: "1rem", gridColumn: "span 2" }}>
-                    <label style={labelStyle}>পূর্ণ নাম *</label>
-                    <input value={form.name || ""} onChange={set("name")} placeholder="আপনার পূর্ণ নাম" style={inputStyle} required />
-                  </div>
-                  <div style={{ marginBottom: "1rem", gridColumn: "span 2" }}>
-                    <label style={labelStyle}>ইমেইল ঠিকানা *</label>
-                    <input type="email" value={form.email || ""} onChange={set("email")} placeholder="email@example.com" style={inputStyle} required />
-                  </div>
-                  <div style={{ marginBottom: "1rem" }}>
-                    <label style={labelStyle}>মোবাইল নম্বর</label>
-                    <input value={form.mobile || ""} onChange={set("mobile")} placeholder="01XXXXXXXXX" style={inputStyle} />
-                  </div>
-                  <div style={{ marginBottom: "1rem" }}>
-                    <label style={labelStyle}>ভূমিকা (Role)</label>
-                    <select value={form.role || "member"} onChange={set("role")} style={inputStyle}>
-                      {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
-                    </select>
-                  </div>
-                  <div style={{ marginBottom: "1rem" }}>
-                    <label style={labelStyle}>পাসওয়ার্ড *</label>
-                    <input type="password" value={form.password || ""} onChange={set("password")} placeholder="কমপক্ষে ৬ অক্ষর" style={inputStyle} required />
-                  </div>
-                  <div style={{ marginBottom: "1.5rem" }}>
-                    <label style={labelStyle}>পাসওয়ার্ড নিশ্চিত করুন *</label>
-                    <input type="password" value={form.confirm || ""} onChange={set("confirm")} placeholder="আবার লিখুন" style={inputStyle} required />
-                  </div>
-                </div>
-                <button type="submit" disabled={loading} style={btnStyle}>
-                  {loading ? "নিবন্ধন হচ্ছে..." : "✅ নিবন্ধন করুন"}
-                </button>
-              </form>
-            )}
+            <form onSubmit={handleLogin}>
+              <div style={{ marginBottom: "1rem" }}>
+                <label style={labelStyle}>ইমেইল ঠিকানা</label>
+                <input
+                  type="email" required value={form.email || ""} onChange={set("email")}
+                  placeholder="your@email.com"
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ marginBottom: "1.5rem" }}>
+                <label style={labelStyle}>পাসওয়ার্ড</label>
+                <input
+                  type="password" required value={form.password || ""} onChange={set("password")}
+                  placeholder="••••••••"
+                  style={inputStyle}
+                />
+              </div>
+              <button type="submit" disabled={loading} style={btnStyle}>
+                {loading ? "লগইন হচ্ছে..." : "🔐 লগইন করুন"}
+              </button>
+            </form>
           </div>
         </div>
 
-        <p style={{ textAlign: "center", color: "rgba(255,255,255,.25)", fontSize: "0.7rem", marginTop: "1.25rem" }}>
-          ⚡ Rust · Actix-Web &nbsp;|&nbsp; ⚛️ React · Vite &nbsp;|&nbsp; 🗄️ MySQL
-        </p>
       </div>
     </div>
   );

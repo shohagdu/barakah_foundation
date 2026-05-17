@@ -10,6 +10,7 @@ DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_DIR="$HOME/app"
 LOG_DIR="$HOME/logs"
 WEB_DIR="$HOME/public_html/barakah_foundation"
+UPLOAD_DIR="$HOME/bmf-uploads"
 SUBFOLDER="barakah_foundation"
 
 echo "============================================"
@@ -30,8 +31,8 @@ fi
 
 # ── Create directories ───────────────────────────────────────
 echo "[1/6] Creating directories..."
-mkdir -p "$APP_DIR" "$LOG_DIR" "$WEB_DIR"
-echo "      done"
+mkdir -p "$APP_DIR" "$LOG_DIR" "$WEB_DIR" "$UPLOAD_DIR"
+echo "      done (uploads preserved at $UPLOAD_DIR)"
 
 # ── Configure .env ───────────────────────────────────────────
 echo ""
@@ -79,11 +80,26 @@ DATABASE_URL=mysql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
 HOST=127.0.0.1
 PORT=${BACKEND_PORT}
 JWT_SECRET=${JWT_SECRET}
+UPLOAD_DIR=${UPLOAD_DIR}
 RUST_LOG=info
 EOF
 
     echo "      .env created at $APP_DIR/.env"
 fi
+
+# Ensure UPLOAD_DIR is present in existing .env (older installs)
+if ! grep -q "^UPLOAD_DIR=" "$APP_DIR/.env"; then
+    echo "UPLOAD_DIR=${UPLOAD_DIR}" >> "$APP_DIR/.env"
+    echo "      added UPLOAD_DIR=$UPLOAD_DIR to existing .env"
+fi
+
+# Migrate any legacy uploads to the safe location (one-time, non-destructive)
+for LEGACY in "$HOME/barakah_foundation_api/uploads" "$APP_DIR/uploads"; do
+    if [ -d "$LEGACY" ] && [ "$LEGACY" != "$UPLOAD_DIR" ]; then
+        echo "      migrating legacy uploads: $LEGACY → $UPLOAD_DIR"
+        cp -rn "$LEGACY"/. "$UPLOAD_DIR"/ 2>/dev/null || true
+    fi
+done
 
 # Read PORT from .env for later use
 BACKEND_PORT=$(grep "^PORT" "$APP_DIR/.env" | cut -d'=' -f2 | tr -d '[:space:]')

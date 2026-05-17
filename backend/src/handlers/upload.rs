@@ -7,7 +7,8 @@ use crate::errors::AppError;
 const ALLOWED: &[&str] = &["jpg", "jpeg", "png", "gif", "webp", "pdf"];
 
 pub async fn upload(mut payload: Multipart) -> Result<HttpResponse, AppError> {
-    let upload_dir = std::path::Path::new("./uploads");
+    let upload_dir_str = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    let upload_dir = std::path::Path::new(&upload_dir_str);
     std::fs::create_dir_all(upload_dir)
         .map_err(|e| AppError::BadRequest(format!("Cannot create upload dir: {}", e)))?;
 
@@ -44,7 +45,7 @@ pub async fn upload(mut payload: Multipart) -> Result<HttpResponse, AppError> {
             .map_err(|e| AppError::BadRequest(format!("Write error: {}", e)))?;
 
         return Ok(HttpResponse::Ok().json(serde_json::json!({
-            "path": format!("/uploads/{}", new_name)
+            "path": format!("/api/uploads/{}", new_name)
         })));
     }
 

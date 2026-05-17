@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getMember } from "../api.js";
+import { getMember, fileUrl } from "../api.js";
 import { Toast, useToast, fmtDate, fmtMoney, Badge } from "../components.jsx";
 
-const CAT_LABEL = { general: "সাধারণ সদস্য", Presedent: "সভাপতি", Treasure: "কোষাধ্যক্ষ" };
+const CAT_LABEL = { general: "সাধারণ সদস্য", Presedent: "সভাপতি", VicePresedent: "সহ-সভাপতি", Treasure: "কোষাধ্যক্ষ", JointTreasure: "সহ-কোষাধ্যক্ষ" };
 const STS_COLOR = { active: "var(--success)", inactive: "var(--danger)", pending: "var(--gold)" };
 const STS_LABEL = { active: "সক্রিয়", inactive: "নিষ্ক্রিয়", pending: "অপেক্ষমাণ" };
 
@@ -28,32 +28,43 @@ function InfoRow({ label, value }) {
 function AttachmentCard({ label, url }) {
   if (!url) return null;
   const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(url);
+  const isPdf   = /\.pdf$/i.test(url);
   const fileName = url.split("/").pop();
+  const href = fileUrl(url);
 
   return (
-    <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "0.75rem 1rem", background: "var(--bg)", display: "flex", alignItems: "center", gap: 12 }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</div>
-        {isImage ? (
-          <a href={url} target="_blank" rel="noreferrer">
-            <img src={url} alt={label} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }} />
-          </a>
-        ) : (
-          <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text)", fontSize: "0.82rem" }}>
-            <span>📄</span>
-            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName}</span>
-          </div>
-        )}
+    <div style={{ border: "1px solid var(--border)", borderRadius: 10, padding: "0.75rem 1rem", background: "var(--bg)", display: "flex", flexDirection: isPdf ? "column" : "row", alignItems: isPdf ? "stretch" : "center", gap: 12 }}>
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: isPdf ? "column" : "row", alignItems: isPdf ? "stretch" : "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>{label}</div>
+          {isImage ? (
+            <a href={href} target="_blank" rel="noreferrer">
+              <img src={href} alt={label} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: "1px solid var(--border)", display: "block" }} />
+            </a>
+          ) : (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--text)", fontSize: "0.82rem" }}>
+              <span>📄</span>
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{fileName}</span>
+            </div>
+          )}
+        </div>
+        <a
+          href={href}
+          download={fileName}
+          target="_blank"
+          rel="noreferrer"
+          style={{ flexShrink: 0, background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 5, alignSelf: isPdf ? "flex-end" : "auto" }}
+        >
+          ⬇ ডাউনলোড
+        </a>
       </div>
-      <a
-        href={url}
-        download={fileName}
-        target="_blank"
-        rel="noreferrer"
-        style={{ flexShrink: 0, background: "var(--primary)", color: "#fff", border: "none", borderRadius: 8, padding: "7px 14px", fontSize: "0.78rem", fontWeight: 700, textDecoration: "none", display: "flex", alignItems: "center", gap: 5 }}
-      >
-        ⬇ ডাউনলোড
-      </a>
+      {isPdf && (
+        <iframe
+          src={href}
+          title={label}
+          style={{ width: "100%", height: 480, border: "1px solid var(--border)", borderRadius: 8, background: "#fff" }}
+        />
+      )}
     </div>
   );
 }
@@ -112,7 +123,7 @@ export default function MemberDetail() {
       {/* Profile card */}
       <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 14, padding: "1.5rem", marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "1.5rem", flexWrap: "wrap" }}>
         {member.image
-          ? <img src={member.image} alt={member.name} style={{ width: 88, height: 88, objectFit: "cover", borderRadius: "50%", border: "3px solid var(--border)", flexShrink: 0 }} />
+          ? <img src={fileUrl(member.image)} alt={member.name} style={{ width: 88, height: 88, objectFit: "cover", borderRadius: "50%", border: "3px solid var(--border)", flexShrink: 0 }} />
           : <div style={{ width: 88, height: 88, borderRadius: "50%", background: "var(--primary)", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "2rem", fontWeight: 800, flexShrink: 0 }}>{member.name?.[0]?.toUpperCase() || "?"}</div>
         }
         <div style={{ flex: 1 }}>

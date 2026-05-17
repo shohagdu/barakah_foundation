@@ -6,7 +6,7 @@ import {
 } from "../components.jsx";
 import {
   getExpenses, getExpenseSummary, approveExpense, rejectExpense, deleteExpense,
-  getExpenseCategories,
+  getExpenseCategories, fileUrl,
 } from "../api.js";
 import { getStoredUser } from "../auth.js";
 
@@ -127,7 +127,7 @@ function ViewModal({ exp, onClose }) {
       {exp.receiptImage && (
         <div style={{ marginTop: "1rem" }}>
           <div style={{ fontSize: "0.72rem", color: "var(--muted)", marginBottom: 6 }}>রসিদ</div>
-          <img src={`/uploads/${exp.receiptImage}`} alt="receipt"
+          <img src={fileUrl(exp.receiptImage)} alt="receipt"
             style={{ maxWidth: "100%", borderRadius: 8, border: "1px solid var(--border)" }} />
         </div>
       )}

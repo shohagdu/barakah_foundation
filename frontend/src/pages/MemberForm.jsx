@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { getMember, createMember, updateMember, uploadFile } from "../api.js";
+import { getMember, createMember, updateMember, uploadFile, fileUrl } from "../api.js";
 import {
   Field, Input, Select, Textarea, Btn, Toast, useToast, today,
 } from "../components.jsx";
@@ -22,6 +22,7 @@ function FileUpload({ value, onChange, accept = "image/*" }) {
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef(null);
   const isImage  = value && /\.(jpg|jpeg|png|gif|webp)$/i.test(value);
+  const isPdf    = value && /\.pdf$/i.test(value);
 
   const handleChange = async e => {
     const file = e.target.files[0];
@@ -41,15 +42,24 @@ function FileUpload({ value, onChange, accept = "image/*" }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {value && (
-        <div style={{ display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
-          {isImage
-            ? <img src={value} alt="preview" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: "2px solid var(--border)" }} />
-            : <div style={{ padding: "8px 12px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.8rem", color: "var(--text)", display: "flex", alignItems: "center", gap: 6 }}>
-                📄 {value.split("/").pop()}
-              </div>
-          }
-          <button type="button" onClick={() => onChange("")} style={{ background: "var(--danger)", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>
-        </div>
+        <>
+          <div style={{ display: "inline-flex", alignItems: "flex-start", gap: 8 }}>
+            {isImage
+              ? <img src={fileUrl(value)} alt="preview" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, border: "2px solid var(--border)" }} />
+              : <a href={fileUrl(value)} target="_blank" rel="noreferrer" style={{ padding: "8px 12px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, fontSize: "0.8rem", color: "var(--text)", display: "flex", alignItems: "center", gap: 6, textDecoration: "none" }}>
+                  📄 {value.split("/").pop()}
+                </a>
+            }
+            <button type="button" onClick={() => onChange("")} style={{ background: "var(--danger)", color: "#fff", border: "none", borderRadius: "50%", width: 20, height: 20, cursor: "pointer", fontSize: "0.65rem", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>
+          </div>
+          {isPdf && (
+            <iframe
+              src={fileUrl(value)}
+              title="pdf preview"
+              style={{ width: "100%", maxWidth: 560, height: 360, border: "1px solid var(--border)", borderRadius: 8, background: "#fff" }}
+            />
+          )}
+        </>
       )}
       <input type="file" ref={inputRef} style={{ display: "none" }} accept={accept} onChange={handleChange} />
       <button
@@ -189,7 +199,7 @@ export default function MemberForm() {
             <div>
               <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--muted)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>ছবি</div>
               {form.image
-                ? <img src={form.image} alt="profile" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%", border: "3px solid var(--border)", display: "block", marginBottom: 6 }} />
+                ? <img src={fileUrl(form.image)} alt="profile" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: "50%", border: "3px solid var(--border)", display: "block", marginBottom: 6 }} />
                 : <div style={{ width: 80, height: 80, borderRadius: "50%", background: "var(--bg)", border: "2px dashed var(--border)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--muted)", fontSize: "1.5rem", marginBottom: 6 }}>👤</div>
               }
               <input
@@ -223,7 +233,9 @@ export default function MemberForm() {
                 <Select value={form.category} onChange={set("category")}>
                   <option value="general">সাধারণ সদস্য</option>
                   <option value="Presedent">সভাপতি</option>
+                  <option value="VicePresedent">সহ-সভাপতি</option>
                   <option value="Treasure">কোষাধ্যক্ষ</option>
+                  <option value="JointTreasure">সহ-কোষাধ্যক্ষ</option>
                 </Select>
               </Field>
               <Field label="অবস্থা" half>

@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { getMembers, deleteMember } from "../api.js";
+import { getMembers, deleteMember, fileUrl } from "../api.js";
 import { getToken } from "../auth.js";
 import {
   Btn, StatCard, Table, Badge, Toast, PageHeader,
   SearchBox, StatsGrid, useToast, fmtDate, fmtMoney,
 } from "../components.jsx";
 
-const CAT_LABEL = { general: "সাধারণ", Presedent: "সভাপতি", Treasure: "কোষাধ্যক্ষ" };
+const CAT_LABEL = { general: "সাধারণ", Presedent: "সভাপতি", VicePresedent: "সহ-সভাপতি", Treasure: "কোষাধ্যক্ষ", JointTreasure: "সহ-কোষাধ্যক্ষ" };
 const STS_COLOR = { active: "var(--success)", inactive: "var(--danger)", pending: "var(--gold)" };
 const STS_LABEL = { active: "সক্রিয়", inactive: "নিষ্ক্রিয়", pending: "অপেক্ষমাণ" };
 
@@ -96,7 +96,7 @@ export default function Members() {
       <Table
         loading={loading}
         cols={[
-          { key: "image", label: "", render: r => <Avatar src={r.image} name={r.name} /> },
+          { key: "image", label: "", render: r => <Avatar src={fileUrl(r.image)} name={r.name} /> },
           { key: "name",  label: "নাম", render: r => (
             <div>
               <div style={{ fontWeight: 600 }}>{r.name}</div>

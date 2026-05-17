@@ -51,6 +51,19 @@ export const createMember = (body)      => api.post("/members", body);
 export const updateMember = (id, body)  => api.put(`/members/${id}`, body);
 export const deleteMember = (id)        => api.delete(`/members/${id}`);
 
+// ── File URL helper ────────────────────────────────────────
+// Normalizes stored upload paths so they always resolve through the API base.
+// Accepts: "/api/uploads/x.jpg", "/uploads/x.jpg" (legacy), bare filename,
+// or absolute http(s) URLs (returned unchanged).
+export const fileUrl = (path) => {
+  if (!path) return "";
+  if (/^https?:\/\//i.test(path)) return path;
+  const baseNoApi = BASE.replace(/\/api\/?$/, "");
+  if (path.startsWith("/api/")) return `${baseNoApi}${path}`;
+  if (path.startsWith("/uploads/")) return `${BASE}${path}`;
+  return `${BASE}/uploads/${path.replace(/^\/+/, "")}`;
+};
+
 // ── File Upload ────────────────────────────────────────────
 export const uploadFile = async (file) => {
   const token = getToken();

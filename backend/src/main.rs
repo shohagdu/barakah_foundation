@@ -20,6 +20,9 @@ async fn main() -> std::io::Result<()> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port: u16 = env::var("PORT").unwrap_or_else(|_| "8080".to_string()).parse().expect("PORT must be a number");
+    let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
+    std::fs::create_dir_all(&upload_dir).ok();
+    log::info!("📁 Upload dir: {}", upload_dir);
 
     let pool = MySqlPoolOptions::new()
         .max_connections(10)
@@ -35,12 +38,14 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let cors = Cors::default().allow_any_origin().allow_any_method().allow_any_header().max_age(3600);
         let jwt_mw = HttpAuthentication::bearer(auth::jwt_validator);
+        let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
 
         App::new()
             .wrap(cors)
             .wrap(Logger::default())
             .app_data(pool_data.clone())
-            .service(actix_files::Files::new("/uploads", "./uploads"))
+            .service(actix_files::Files::new("/api/uploads", &upload_dir).disable_content_disposition())
+            .service(actix_files::Files::new("/uploads", &upload_dir).disable_content_disposition())
             .app_data(web::JsonConfig::default().error_handler(|err, _| {
                 let msg = err.to_string();
                 actix_web::error::InternalError::from_response(

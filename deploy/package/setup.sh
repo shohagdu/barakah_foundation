@@ -1,119 +1,197 @@
 #!/bin/bash
 # ============================================================
-# Barakah Foundation — Server Setup
-# Run after uploading: bash ~/setup.sh
+# Barakah Foundation — ONE-SHOT SERVER SETUP
+# Upload the entire deploy/ folder to your server, then run:
+#   bash ~/deploy/setup.sh
 # ============================================================
 set -e
 
-APP_DIR="$HOME/barakah_foundation_api"
-WEB_DIR="$HOME/public_html/barakah_foundation"
+DEPLOY_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_DIR="$HOME/app"
 LOG_DIR="$HOME/logs"
+WEB_DIR="$HOME/public_html/barakah_foundation"
+UPLOAD_DIR="$HOME/bmf-uploads"
+SUBFOLDER="barakah_foundation"
 
 echo "============================================"
-echo " Barakah Foundation — Setup"
+echo " Barakah Foundation — Server Setup"
 echo "============================================"
+echo " Deploy dir : $DEPLOY_DIR"
+echo " App dir    : $APP_DIR"
+echo " Web dir    : $WEB_DIR"
+echo "============================================"
+echo ""
 
-# ── Cleanup OLD/rogue files from previous deploys ────────────
-echo "[1/6] Cleaning up old files..."
-
-# Old rogue .htaccess at root (caused 403 errors)
-if [ -f "$HOME/public_html/.htaccess" ]; then
-    BACKUP="$HOME/public_html/.htaccess.bak.$(date +%s)"
-    mv "$HOME/public_html/.htaccess" "$BACKUP"
-    echo "      Moved old root .htaccess → $BACKUP"
-fi
-
-# Old test/proxy files
-rm -f "$WEB_DIR/test.php"
-rm -f "$WEB_DIR/_api.php"
-rm -f "$WEB_DIR/api/test.php"
-rm -f "$HOME/public_html/test-root.php"
-
-# ── Check .env ───────────────────────────────────────────────
-if [ ! -f "$APP_DIR/.env" ]; then
-    echo ""
-    echo " ERROR: $APP_DIR/.env not found!"
-    echo ""
-    echo " Create it first:"
-    echo "   nano $APP_DIR/.env"
-    echo ""
-    echo " Content:"
-    echo "   DATABASE_URL=mysql://DB_USER:DB_PASS@localhost:3306/DB_NAME"
-    echo "   HOST=127.0.0.1"
-    echo "   PORT=8080"
-    echo "   JWT_SECRET=minimum_32_character_random_string_here"
-    echo "   RUST_LOG=info"
+# ── Verify binary exists ─────────────────────────────────────
+if [ ! -f "$DEPLOY_DIR/dist/bmf-backend" ]; then
+    echo " ERROR: dist/bmf-backend not found in $DEPLOY_DIR"
+    echo " Make sure you uploaded the full deploy/ folder including dist/"
     exit 1
 fi
 
-# ── Permissions ──────────────────────────────────────────────
-echo "[2/6] Setting permissions..."
-chmod +x "$APP_DIR/bmf-backend"
-chmod +x "$APP_DIR"/*.sh
-mkdir -p "$LOG_DIR"
-mkdir -p "$APP_DIR/uploads"
+# ── Create directories ───────────────────────────────────────
+echo "[1/6] Creating directories..."
+mkdir -p "$APP_DIR" "$LOG_DIR" "$WEB_DIR" "$UPLOAD_DIR"
+echo "      done (uploads preserved at $UPLOAD_DIR)"
 
-# Web files: 755 for dirs, 644 for files
-find "$WEB_DIR" -type d -exec chmod 755 {} \;
-find "$WEB_DIR" -type f -exec chmod 644 {} \;
+# ── Configure .env ───────────────────────────────────────────
+echo ""
+echo "[2/6] Configuring environment (.env)..."
 
-# ── Database ─────────────────────────────────────────────────
-echo "[3/6] Importing database schema..."
-DB_URL=$(grep "^DATABASE_URL" "$APP_DIR/.env" | cut -d'=' -f2-)
-DB_USER=$(echo "$DB_URL" | sed 's|mysql://||' | cut -d':' -f1)
-DB_PASS=$(echo "$DB_URL" | sed 's|mysql://[^:]*:||' | cut -d'@' -f1)
-DB_HOST=$(echo "$DB_URL" | cut -d'@' -f2 | cut -d':' -f1)
-DB_PORT=$(echo "$DB_URL" | cut -d'@' -f2 | cut -d':' -f2 | cut -d'/' -f1)
-DB_NAME=$(echo "$DB_URL" | rev | cut -d'/' -f1 | rev)
-
-if [ -f "$HOME/schema.sql" ]; then
-    mysql -h "$DB_HOST" -P "$DB_PORT" -u "$DB_USER" -p"$DB_PASS" "$DB_NAME" < "$HOME/schema.sql" 2>&1 | head -3 \
-        && echo "      OK: schema imported" \
-        || echo "      WARNING: schema errors (tables may already exist — OK)"
+if [ -f "$APP_DIR/.env" ]; then
+    echo "      .env already exists — skipping (delete ~/app/.env to reconfigure)"
 else
-    echo "      SKIP: schema.sql not found"
+    echo ""
+    echo "  Enter your cPanel database details:"
+    echo "  (Find these in cPanel → MySQL Databases)"
+    echo ""
+
+    read -rp "  DB Host     [localhost]: " DB_HOST
+    DB_HOST="${DB_HOST:-localhost}"
+
+    read -rp "  DB Port     [3306]: " DB_PORT
+    DB_PORT="${DB_PORT:-3306}"
+
+    read -rp "  DB Name     : " DB_NAME
+    while [ -z "$DB_NAME" ]; do
+        read -rp "  DB Name (required): " DB_NAME
+    done
+
+    read -rp "  DB User     : " DB_USER
+    while [ -z "$DB_USER" ]; do
+        read -rp "  DB User (required): " DB_USER
+    done
+
+    read -rsp "  DB Password : " DB_PASS
+    echo ""
+    while [ -z "$DB_PASS" ]; do
+        read -rsp "  DB Password (required): " DB_PASS
+        echo ""
+    done
+
+    read -rp "  Backend Port [8080]: " BACKEND_PORT
+    BACKEND_PORT="${BACKEND_PORT:-8080}"
+
+    # Generate a random JWT secret
+    JWT_SECRET=$(head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 48)
+
+    cat > "$APP_DIR/.env" <<EOF
+DATABASE_URL=mysql://${DB_USER}:${DB_PASS}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+HOST=127.0.0.1
+PORT=${BACKEND_PORT}
+JWT_SECRET=${JWT_SECRET}
+UPLOAD_DIR=${UPLOAD_DIR}
+RUST_LOG=info
+EOF
+
+    echo "      .env created at $APP_DIR/.env"
+fi
+
+# Ensure UPLOAD_DIR is present in existing .env (older installs)
+if ! grep -q "^UPLOAD_DIR=" "$APP_DIR/.env"; then
+    echo "UPLOAD_DIR=${UPLOAD_DIR}" >> "$APP_DIR/.env"
+    echo "      added UPLOAD_DIR=$UPLOAD_DIR to existing .env"
+fi
+
+# Migrate any legacy uploads to the safe location (one-time, non-destructive)
+for LEGACY in "$HOME/barakah_foundation_api/uploads" "$APP_DIR/uploads"; do
+    if [ -d "$LEGACY" ] && [ "$LEGACY" != "$UPLOAD_DIR" ]; then
+        echo "      migrating legacy uploads: $LEGACY → $UPLOAD_DIR"
+        cp -rn "$LEGACY"/. "$UPLOAD_DIR"/ 2>/dev/null || true
+    fi
+done
+
+# Read PORT from .env for later use
+BACKEND_PORT=$(grep "^PORT" "$APP_DIR/.env" | cut -d'=' -f2 | tr -d '[:space:]')
+BACKEND_PORT="${BACKEND_PORT:-8080}"
+
+# ── Copy binary and scripts ──────────────────────────────────
+echo ""
+echo "[3/6] Installing backend binary and scripts..."
+cp "$DEPLOY_DIR/dist/bmf-backend" "$APP_DIR/bmf-backend"
+cp "$DEPLOY_DIR/start.sh"   "$APP_DIR/start.sh"
+cp "$DEPLOY_DIR/stop.sh"    "$APP_DIR/stop.sh"
+cp "$DEPLOY_DIR/restart.sh" "$APP_DIR/restart.sh"
+
+chmod +x "$APP_DIR/bmf-backend"
+chmod +x "$APP_DIR/start.sh" "$APP_DIR/stop.sh" "$APP_DIR/restart.sh"
+echo "      done"
+
+# ── Deploy frontend ──────────────────────────────────────────
+echo ""
+echo "[4/6] Deploying frontend to $WEB_DIR ..."
+cp -r "$DEPLOY_DIR/dist/public_html/." "$WEB_DIR/"
+cp "$DEPLOY_DIR/public_html/.htaccess" "$WEB_DIR/.htaccess"
+echo "      done"
+
+# ── Import database schema ───────────────────────────────────
+echo ""
+echo "[5/6] Importing database schema..."
+
+if [ -f "$DEPLOY_DIR/schema.sql" ]; then
+    # Parse DB credentials from .env
+    DB_URL=$(grep "^DATABASE_URL" "$APP_DIR/.env" | cut -d'=' -f2-)
+    _DB_USER=$(echo "$DB_URL" | sed 's|mysql://||' | cut -d':' -f1)
+    _DB_PASS=$(echo "$DB_URL" | sed 's|mysql://[^:]*:||' | cut -d'@' -f1)
+    _DB_HOST=$(echo "$DB_URL" | cut -d'@' -f2 | cut -d':' -f1)
+    _DB_PORT=$(echo "$DB_URL" | cut -d'@' -f2 | cut -d':' -f2 | cut -d'/' -f1)
+    _DB_NAME=$(echo "$DB_URL" | rev | cut -d'/' -f1 | rev)
+
+    mysql -h "$_DB_HOST" -P "$_DB_PORT" -u "$_DB_USER" -p"$_DB_PASS" "$_DB_NAME" \
+        < "$DEPLOY_DIR/schema.sql" \
+        && echo "      Schema imported successfully" \
+        || echo "      WARNING: Schema import had errors (tables may already exist — this is OK)"
+else
+    echo "      WARNING: schema.sql not found — skipping"
 fi
 
 # ── Start backend ────────────────────────────────────────────
-echo "[4/6] Restarting backend..."
-bash "$APP_DIR/stop.sh" 2>/dev/null || true
-sleep 1
+echo ""
+echo "[6/6] Starting backend..."
+
+# Stop any existing instance first
+if [ -f "$APP_DIR/bmf.pid" ] && kill -0 "$(cat "$APP_DIR/bmf.pid")" 2>/dev/null; then
+    echo "      Stopping existing backend..."
+    kill "$(cat "$APP_DIR/bmf.pid")" 2>/dev/null || true
+    rm -f "$APP_DIR/bmf.pid"
+    sleep 1
+fi
+
 bash "$APP_DIR/start.sh"
 
-# ── Backend health check ─────────────────────────────────────
-echo "[5/6] Backend health check..."
 sleep 2
-if curl -sf http://127.0.0.1:8080/api/health > /dev/null; then
-    echo "      OK: backend running on port 8080"
+
+if curl -sf "http://127.0.0.1:${BACKEND_PORT}/api/health" > /dev/null 2>&1; then
+    echo "      Backend is running and healthy!"
 else
-    echo "      FAIL: backend not responding"
-    echo "      Check: tail -50 $LOG_DIR/bmf.log"
-    exit 1
+    echo "      Backend started — health check pending (may take a few seconds)"
+    echo "      Check logs: tail -50 $LOG_DIR/bmf.log"
 fi
 
-# ── PHP proxy check ──────────────────────────────────────────
-echo "[6/6] Testing PHP proxy..."
-DOMAIN=$(grep -oP '(?<=ServerName )\S+' /etc/apache2/sites-enabled/*.conf 2>/dev/null | head -1)
-[ -z "$DOMAIN" ] && DOMAIN="$(hostname -f)"
+# ── Add cron job ─────────────────────────────────────────────
+echo ""
+echo "      Adding cron job to auto-restart backend if it crashes..."
+CRON_CMD="*/5 * * * * pgrep -f bmf-backend > /dev/null || bash $APP_DIR/start.sh >> $LOG_DIR/cron.log 2>&1"
+# Add only if not already present
+( crontab -l 2>/dev/null | grep -v "bmf-backend"; echo "$CRON_CMD" ) | crontab -
+echo "      Cron job added"
 
-# Test locally (avoids SSL issues)
-RESULT=$(curl -sf "https://localhost/barakah_foundation/api/health" 2>&1 || curl -sf "http://localhost/barakah_foundation/api/health" 2>&1 || echo "FAIL")
-if echo "$RESULT" | grep -q "status"; then
-    echo "      OK: PHP proxy working"
-else
-    echo "      NOTE: Test from browser → https://YOUR_DOMAIN/barakah_foundation/api/health"
-fi
-
+# ── Done ─────────────────────────────────────────────────────
 echo ""
 echo "============================================"
-echo " DONE — সব OK"
+echo " SETUP COMPLETE"
 echo "============================================"
-echo " Site: https://YOUR_DOMAIN/barakah_foundation/"
-echo " Login: admin@barakah.com / Admin@1234"
 echo ""
-echo " Commands:"
-echo "   Start  : bash ~/barakah_foundation_api/start.sh"
-echo "   Stop   : bash ~/barakah_foundation_api/stop.sh"
-echo "   Restart: bash ~/barakah_foundation_api/restart.sh"
-echo "   Logs   : tail -f ~/logs/bmf.log"
+echo " Site URL   : https://shohozit.com/$SUBFOLDER/"
+echo " API health : curl http://127.0.0.1:${BACKEND_PORT}/api/health"
+echo " Logs       : tail -f $LOG_DIR/bmf.log"
+echo ""
+echo " Default login:"
+echo "   Email   : admin@barakah.org"
+echo "   Password: Admin@1234  (change after first login!)"
+echo ""
+echo " Manage backend:"
+echo "   Start  : bash $APP_DIR/start.sh"
+echo "   Stop   : bash $APP_DIR/stop.sh"
+echo "   Restart: bash $APP_DIR/restart.sh"
 echo "============================================"
