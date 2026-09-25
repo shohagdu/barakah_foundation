@@ -20,6 +20,8 @@ async fn main() -> std::io::Result<()> {
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     let host = env::var("HOST").unwrap_or_else(|_| "127.0.0.1".to_string());
     let port: u16 = env::var("PORT").unwrap_or_else(|_| "8080".to_string()).parse().expect("PORT must be a number");
+    // Shared hosting caps process/thread counts; actix defaults to one worker per CPU
+    let workers: usize = env::var("WORKERS").unwrap_or_else(|_| "4".to_string()).parse().expect("WORKERS must be a number");
     let upload_dir = env::var("UPLOAD_DIR").unwrap_or_else(|_| "./uploads".to_string());
     std::fs::create_dir_all(&upload_dir).ok();
     log::info!("📁 Upload dir: {}", upload_dir);
@@ -196,6 +198,7 @@ async fn main() -> std::io::Result<()> {
                     .route("/collections/{id}", web::delete().to(handlers::collections::delete))
             )
     })
+    .workers(workers)
     .bind((host, port))?
     .run()
     .await

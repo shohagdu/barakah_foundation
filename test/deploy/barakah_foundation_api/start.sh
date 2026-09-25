@@ -10,8 +10,6 @@ fi
 
 mkdir -p "$LOG_DIR"
 cd "$APP_DIR"
-# cPanel File Manager extraction drops the exec bit
-chmod +x ./bmf-backend
 nohup ./bmf-backend >> "$LOG_DIR/bmf.log" 2>&1 &
 echo $! > "$PID_FILE"
 echo "Started (PID: $!)"
