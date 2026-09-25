@@ -380,6 +380,21 @@ pub async fn member_summary_report(
     .bind(from).bind(to)
     .fetch_all(db).await?;
 
+    // Special collections (বিশেষ সংগ্রহ) per member, same month window
+    let specials: Vec<(i64, Decimal)> = sqlx::query_as(
+        "SELECT cm.member_id, COALESCE(SUM(cm.amount), 0)
+         FROM collection_members cm
+         JOIN collections c ON c.id = cm.collection_id
+         WHERE cm.status = 'paid'
+           AND DATE_FORMAT(c.collection_date, '%Y-%m') BETWEEN ? AND ?
+         GROUP BY cm.member_id"
+    )
+    .bind(from).bind(to)
+    .fetch_all(db).await?;
+    let special_lookup: HashMap<i64, f64> = specials.into_iter()
+        .map(|(mid, amt)| (mid, amt.try_into().unwrap_or(0.0)))
+        .collect();
+
     let months: Vec<String> = {
         let mut seen = HashSet::new();
         let mut v: Vec<String> = Vec::new();
@@ -412,6 +427,7 @@ pub async fn member_summary_report(
             "memberName": m.name,
             "monthly":    monthly,
             "total":      total,
+            "special":    *special_lookup.get(&m.id).unwrap_or(&0.0),
         })
     }).collect();
 
@@ -423,11 +439,16 @@ pub async fn member_summary_report(
     }).collect();
 
     let grand_total: f64 = col_totals.values().sum();
+    let special_total: f64 = members.iter()
+        .map(|m| *special_lookup.get(&m.id).unwrap_or(&0.0))
+        .sum();
 
+    // total / grandTotal stay deposit-only; special* is reported separately
     Ok(HttpResponse::Ok().json(json!({
-        "months":     months,
-        "members":    member_rows,
-        "colTotals":  col_totals,
-        "grandTotal": grand_total,
+        "months":       months,
+        "members":      member_rows,
+        "colTotals":    col_totals,
+        "grandTotal":   grand_total,
+        "specialTotal": special_total,
     })))
 }

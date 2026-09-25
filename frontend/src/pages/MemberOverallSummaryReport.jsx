@@ -85,10 +85,10 @@ const PRINT_STYLE = `
 `;
 
 // ── PDF opener ─────────────────────────────────────────────────
-function openPdf({ months, members, colTotals, grandTotal, from, to }) {
+function openPdf({ months, members, colTotals, specialTotal, grandTotal, from, to }) {
   const d      = new Date();
   const datebn = d.toLocaleDateString("bn-BD");
-  const cols   = months.length + 3;
+  const cols   = months.length + 4;
 
   const colHdrs = months.map(mo => `<th>${fmtMonth(mo)}</th>`).join("");
 
@@ -97,12 +97,14 @@ function openPdf({ months, members, colTotals, grandTotal, from, to }) {
       const amt = +(m.monthly?.[mo] || 0);
       return `<td style="text-align:right;${amt > 0 ? "color:#15803d;font-weight:700;" : "color:#aaa;"}">${amt > 0 ? money(amt) : "—"}</td>`;
     }).join("");
-    const total = +(m.total || 0);
-    const bg    = i % 2 === 0 ? "#f5f9f7" : "#fff";
+    const special = +(m.special || 0);
+    const total   = +(m.total || 0) + special;
+    const bg      = i % 2 === 0 ? "#f5f9f7" : "#fff";
     return `<tr style="background:${bg};-webkit-print-color-adjust:exact;print-color-adjust:exact;">
       <td style="text-align:center;color:#888;font-size:7.5pt;">${i + 1}</td>
       <td style="font-weight:600;">${m.memberName || "—"}</td>
       ${cells}
+      <td style="text-align:right;${special > 0 ? "color:#92400e;font-weight:700;" : "color:#aaa;"}">${special > 0 ? money(special) : "—"}</td>
       <td style="text-align:right;font-weight:800;background:#eef6f2;-webkit-print-color-adjust:exact;print-color-adjust:exact;">${total > 0 ? money(total) : "—"}</td>
     </tr>`;
   }).join("");
@@ -148,6 +150,7 @@ function openPdf({ months, members, colTotals, grandTotal, from, to }) {
       <th style="width:32px;text-align:center;">ক্র.নং</th>
       <th style="min-width:130px;text-align:left;">সদস্যের নাম</th>
       ${colHdrs}
+      <th style="min-width:90px;">বিশেষ সংগ্রহ</th>
       <th style="min-width:90px;text-align:right;background:#164d3a !important;">মোট</th>
     </tr>
   </thead>
@@ -156,6 +159,7 @@ function openPdf({ months, members, colTotals, grandTotal, from, to }) {
     <tr class="foot-row">
       <td colspan="2">সর্বমোট</td>
       ${footCells}
+      <td style="text-align:right;">${specialTotal > 0 ? money(specialTotal) : "—"}</td>
       <td class="ft-grand" style="text-align:right;font-size:9pt;">${money(grandTotal)}</td>
     </tr>
   </tfoot>
@@ -202,7 +206,9 @@ export default function MemberOverallSummaryReport() {
   const months     = data?.months     || [];
   const members    = data?.members    || [];
   const colTotals  = data?.colTotals  || {};
-  const grandTotal = data?.grandTotal || 0;
+  const depositTotal = data?.grandTotal   || 0;
+  const specialTotal = data?.specialTotal || 0;
+  const grandTotal   = depositTotal + specialTotal;
 
   const presets = [
     { label: "সকল সময়",   from: "",                               to: ""                 },
@@ -230,7 +236,7 @@ export default function MemberOverallSummaryReport() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1.5rem", flexWrap: "wrap", gap: 12 }}>
         <div>
           <h2 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--text)", margin: 0 }}>সার্বিক চাঁদা প্রতিবেদন</h2>
-          <p style={{ color: "var(--muted)", fontSize: "0.82rem", marginTop: 4 }}>সকল সদস্যের মাসভিত্তিক চাঁদার পূর্ণ বিবরণী</p>
+          <p style={{ color: "var(--muted)", fontSize: "0.82rem", marginTop: 4 }}>সকল সদস্যের মাসভিত্তিক চাঁদা ও বিশেষ সংগ্রহের পূর্ণ বিবরণী</p>
         </div>
         {fetched && (
           <div style={{ display: "flex", gap: 8 }}>
@@ -239,7 +245,7 @@ export default function MemberOverallSummaryReport() {
               background: "transparent", color: "#0d3528",
               fontFamily: "inherit", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
             }}>🖨️ প্রিন্ট</button>
-            <button onClick={() => openPdf({ months, members, colTotals, grandTotal, from, to })} style={{
+            <button onClick={() => openPdf({ months, members, colTotals, specialTotal, grandTotal, from, to })} style={{
               padding: "9px 20px", borderRadius: 9, border: "none",
               background: "#0d3528", color: "#fff",
               fontFamily: "inherit", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
@@ -285,7 +291,9 @@ export default function MemberOverallSummaryReport() {
           {[
             { label: "মোট সদস্য",  val: `${members.length} জন`, color: "var(--primary)" },
             { label: "সক্রিয় মাস", val: `${months.length} মাস`, color: "#8b5cf6"        },
-            { label: "মোট সংগ্রহ", val: money(grandTotal),       color: "var(--success)" },
+            { label: "মাসিক চাঁদা",  val: money(depositTotal),    color: "var(--primary)" },
+            { label: "বিশেষ সংগ্রহ", val: money(specialTotal),    color: "#b45309"        },
+            { label: "মোট সংগ্রহ",  val: money(grandTotal),      color: "var(--success)" },
           ].map(c => (
             <div key={c.label} style={{
               background: "var(--card)", border: "1px solid var(--border)",
@@ -315,11 +323,11 @@ export default function MemberOverallSummaryReport() {
             </div>
 
             <div style={{ overflowX: "auto" }}>
-              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: Math.max(640, 220 + months.length * 110) }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", minWidth: Math.max(760, 330 + months.length * 110) }}>
                 <thead>
                   {/* Print-only org header */}
                   <tr className="org-hdr">
-                    <td colSpan={months.length + 3} style={{ border: "1px solid #000", padding: "8px 12px", textAlign: "center" }}>
+                    <td colSpan={months.length + 4} style={{ border: "1px solid #000", padding: "8px 12px", textAlign: "center" }}>
                       <div style={{ fontFamily: "'Noto Serif Bengali',serif", fontSize: "13pt", fontWeight: 800 }}>বারাকাহ মুশারাকাহ ফাউন্ডেশন</div>
                       <div style={{ fontSize: "11pt", fontWeight: 700, marginTop: 2 }}>সার্বিক চাঁদা প্রতিবেদন</div>
                       <div style={{ fontSize: "9pt", marginTop: 2 }}>সময়কাল: {from && to ? `${fmtMonth(from)} — ${fmtMonth(to)}` : "সকল সময়"}</div>
@@ -332,14 +340,16 @@ export default function MemberOverallSummaryReport() {
                     {months.map(mo => (
                       <th key={mo} style={{ ...TH, minWidth: 105 }}>{fmtMonth(mo)}</th>
                     ))}
+                    <th style={{ ...TH, minWidth: 115 }}>বিশেষ সংগ্রহ</th>
                     <th style={{ ...TH, minWidth: 115, background: "#164d3a" }}>মোট</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {members.map((m, i) => {
-                    const total = +(m.total || 0);
-                    const rowBg = i % 2 === 0 ? "#f8fbf9" : "#fff";
+                    const special = +(m.special || 0);
+                    const total   = +(m.total || 0) + special;
+                    const rowBg   = i % 2 === 0 ? "#f8fbf9" : "#fff";
                     return (
                       <tr key={m.memberId} style={{ background: rowBg }}>
                         <td style={TD({ textAlign: "center", color: "var(--muted)", fontSize: "0.75rem" })}>{i + 1}</td>
@@ -352,6 +362,9 @@ export default function MemberOverallSummaryReport() {
                             </td>
                           );
                         })}
+                        <td style={TD({ textAlign: "right", fontWeight: special > 0 ? 700 : 400, color: special > 0 ? "#b45309" : "var(--muted)" })}>
+                          {special > 0 ? money(special) : "—"}
+                        </td>
                         <td style={TD({ textAlign: "right", fontWeight: 800, background: "#f0f7f4", color: total > 0 ? "var(--text)" : "var(--muted)" })}>
                           {total > 0 ? money(total) : "—"}
                         </td>
@@ -373,6 +386,9 @@ export default function MemberOverallSummaryReport() {
                         </td>
                       );
                     })}
+                    <td style={{ padding: "11px 10px", textAlign: "right", fontWeight: 800, fontSize: "0.88rem", border: "1px solid #000" }}>
+                      {specialTotal > 0 ? money(specialTotal) : "—"}
+                    </td>
                     <td className="tf-grand" style={{ padding: "11px 12px", textAlign: "right", fontWeight: 900, fontSize: "1rem", border: "1px solid #000", background: "#164d3a" }}>
                       {money(grandTotal)}
                     </td>

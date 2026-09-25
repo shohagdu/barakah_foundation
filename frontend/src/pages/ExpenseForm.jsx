@@ -39,7 +39,7 @@ export default function ExpenseForm() {
   useEffect(() => {
     getExpenseCategories().then(c => setCats(c.filter(x => x.isActive !== 0))).catch(() => {});
     getSettingsBanks().then(b => setBanks(b || [])).catch(() => {});
-    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "expense"))).catch(() => {});
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.type === "expense"))).catch(() => {});
     if (isEdit) {
       getExpense(id).then(d => setForm({
         expenseDate:   d.expenseDate?.split("T")[0] || today(),

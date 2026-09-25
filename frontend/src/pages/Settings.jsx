@@ -271,7 +271,7 @@ function ExpenseCategorySettings() {
 
   useEffect(() => {
     load();
-    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "expense"))).catch(() => {});
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.type === "expense"))).catch(() => {});
   }, [load]);
 
   const toPayload = f => ({ name: f.name, nameBn: f.nameBn || null, accountId: f.accountId ? parseInt(f.accountId) : null });
@@ -385,7 +385,7 @@ function IncomeCategorySettings() {
 
   useEffect(() => {
     load();
-    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "income"))).catch(() => {});
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.type === "income"))).catch(() => {});
   }, [load]);
 
   const toPayload = f => ({ name: f.name, nameBn: f.nameBn || null, accountId: f.accountId ? parseInt(f.accountId) : null });

@@ -35,7 +35,7 @@ export default function IncomeForm() {
 
   useEffect(() => {
     getIncomeCategories().then(c => setCats(c.filter(x => x.isActive !== 0))).catch(() => {});
-    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "income"))).catch(() => {});
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.type === "income"))).catch(() => {});
     getSettingsBanks().then(b => setBanks(b || [])).catch(() => {});
     if (isEdit) {
       getIncome(id).then(d => setForm({
