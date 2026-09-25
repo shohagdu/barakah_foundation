@@ -13,3 +13,4 @@ pub mod auth_handler;
 pub mod upload;
 pub mod expenses;
 pub mod collections;
+pub mod incomes;

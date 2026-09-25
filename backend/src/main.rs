@@ -173,6 +173,23 @@ async fn main() -> std::io::Result<()> {
                     .route("/reports/expense-summary", web::get().to(handlers::expenses::report_summary))
                     .route("/reports/expense-detail",  web::get().to(handlers::expenses::report_detail))
 
+                    // Income Categories
+                    .route("/income-categories",      web::get().to(handlers::incomes::cat_list))
+                    .route("/income-categories",      web::post().to(handlers::incomes::cat_create))
+                    .route("/income-categories/{id}", web::put().to(handlers::incomes::cat_update))
+                    .route("/income-categories/{id}", web::delete().to(handlers::incomes::cat_delete))
+
+                    // Incomes
+                    .route("/incomes/summary",        web::get().to(handlers::incomes::summary))
+                    .route("/incomes",                web::get().to(handlers::incomes::list))
+                    .route("/incomes",                web::post().to(handlers::incomes::create))
+                    .route("/incomes/{id}",           web::get().to(handlers::incomes::get_one))
+                    .route("/incomes/{id}",           web::put().to(handlers::incomes::update))
+                    .route("/incomes/{id}",           web::delete().to(handlers::incomes::delete))
+                    .route("/incomes/{id}/approve",   web::post().to(handlers::incomes::approve))
+                    .route("/incomes/{id}/reject",    web::post().to(handlers::incomes::reject))
+                    .route("/reports/income-summary", web::get().to(handlers::incomes::report_summary))
+
                     // Collections (ad-hoc member collections)
                     .route("/collections",      web::get().to(handlers::collections::list))
                     .route("/collections",      web::post().to(handlers::collections::create))

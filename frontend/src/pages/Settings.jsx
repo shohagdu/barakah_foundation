@@ -6,6 +6,7 @@ import {
   approveChartOfAccount,
   getSettingsBanks, createSettingsBank, updateSettingsBank, deleteSettingsBank,
   getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory,
+  getIncomeCategories, createIncomeCategory, updateIncomeCategory, deleteIncomeCategory,
 } from "../api.js";
 import {
   Modal, Field, Input, Select, Btn, Table, Badge,
@@ -257,7 +258,8 @@ function ExpenseCategorySettings() {
   const [cats,    setCats]    = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal,   setModal]   = useState(null); // null | "add" | { edit: cat }
-  const [form,    setForm]    = useState({ name: "", nameBn: "" });
+  const [form,    setForm]    = useState({ name: "", nameBn: "", accountId: "" });
+  const [accounts,setAccounts]= useState([]);
   const [saving,  setSaving]  = useState(false);
   const [toast,   showToast]  = useToast();
 
@@ -267,10 +269,15 @@ function ExpenseCategorySettings() {
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    load();
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "expense"))).catch(() => {});
+  }, [load]);
 
-  const openAdd  = ()  => { setForm({ name: "", nameBn: "" }); setModal("add"); };
-  const openEdit = cat => { setForm({ name: cat.name, nameBn: cat.nameBn || "" }); setModal({ edit: cat }); };
+  const toPayload = f => ({ name: f.name, nameBn: f.nameBn || null, accountId: f.accountId ? parseInt(f.accountId) : null });
+
+  const openAdd  = ()  => { setForm({ name: "", nameBn: "", accountId: "" }); setModal("add"); };
+  const openEdit = cat => { setForm({ name: cat.name, nameBn: cat.nameBn || "", accountId: cat.accountId || "" }); setModal({ edit: cat }); };
 
   const handleSubmit = async e => {
     e.preventDefault();
@@ -278,10 +285,10 @@ function ExpenseCategorySettings() {
     try {
       setSaving(true);
       if (modal?.edit) {
-        await updateExpenseCategory(modal.edit.id, form);
+        await updateExpenseCategory(modal.edit.id, toPayload(form));
         showToast("আপডেট হয়েছে");
       } else {
-        await createExpenseCategory(form);
+        await createExpenseCategory(toPayload(form));
         showToast("ক্যাটাগরি যোগ হয়েছে");
       }
       setModal(null);
@@ -290,13 +297,16 @@ function ExpenseCategorySettings() {
     finally { setSaving(false); }
   };
 
-  const handleToggle = async cat => {
+  // Table's onDelete passes the row id, not the row
+  const handleToggle = async id => {
+    const cat = cats.find(c => c.id === id);
+    if (!cat) return;
     try {
       if (cat.isActive) {
         await deleteExpenseCategory(cat.id);
         showToast("নিষ্ক্রিয় করা হয়েছে");
       } else {
-        await updateExpenseCategory(cat.id, { name: cat.name, nameBn: cat.nameBn, isActive: 1 });
+        await updateExpenseCategory(cat.id, { ...toPayload(cat), isActive: 1 });
         showToast("সক্রিয় করা হয়েছে");
       }
       load();
@@ -325,7 +335,7 @@ function ExpenseCategorySettings() {
         ]}
         rows={cats}
         onEdit={openEdit}
-        onDelete={cat => handleToggle(cat)}
+        onDelete={handleToggle}
       />
 
       {modal && (
@@ -339,6 +349,126 @@ function ExpenseCategorySettings() {
             </Field>
             <Field label="নাম (বাংলা)">
               <Input value={form.nameBn} onChange={set("nameBn")} placeholder="যেমন: অফিস খরচ" />
+            </Field>
+            <Field label="খরচের হিসাব (ডিফল্ট)">
+              <Select value={form.accountId} onChange={set("accountId")}>
+                <option value="">— নির্বাচন করুন —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.category}</option>)}
+              </Select>
+            </Field>
+            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: "1rem" }}>
+              <Btn variant="muted" type="button" onClick={() => setModal(null)}>বাতিল</Btn>
+              <Btn loading={saving} type="submit">সংরক্ষণ</Btn>
+            </div>
+          </form>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── Income Categories ────────────────────────────────────────
+function IncomeCategorySettings() {
+  const [cats,     setCats]     = useState([]);
+  const [accounts, setAccounts] = useState([]);
+  const [loading,  setLoading]  = useState(true);
+  const [modal,    setModal]    = useState(null); // null | "add" | { edit: cat }
+  const [form,     setForm]     = useState({ name: "", nameBn: "", accountId: "" });
+  const [saving,   setSaving]   = useState(false);
+  const [toast,    showToast]   = useToast();
+
+  const load = useCallback(async () => {
+    try { setLoading(true); setCats(await getIncomeCategories()); }
+    catch (e) { showToast(e.message, "error"); }
+    finally { setLoading(false); }
+  }, []);
+
+  useEffect(() => {
+    load();
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "income"))).catch(() => {});
+  }, [load]);
+
+  const toPayload = f => ({ name: f.name, nameBn: f.nameBn || null, accountId: f.accountId ? parseInt(f.accountId) : null });
+
+  const openAdd  = ()  => { setForm({ name: "", nameBn: "", accountId: "" }); setModal("add"); };
+  const openEdit = cat => { setForm({ name: cat.name, nameBn: cat.nameBn || "", accountId: cat.accountId || "" }); setModal({ edit: cat }); };
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    if (!form.name) return showToast("নাম আবশ্যক", "error");
+    try {
+      setSaving(true);
+      if (modal?.edit) {
+        await updateIncomeCategory(modal.edit.id, toPayload(form));
+        showToast("আপডেট হয়েছে");
+      } else {
+        await createIncomeCategory(toPayload(form));
+        showToast("ক্যাটাগরি যোগ হয়েছে");
+      }
+      setModal(null);
+      load();
+    } catch (e) { showToast(e.message, "error"); }
+    finally { setSaving(false); }
+  };
+
+  const handleToggle = async id => {
+    const cat = cats.find(c => c.id === id);
+    if (!cat) return;
+    try {
+      if (cat.isActive) {
+        await deleteIncomeCategory(cat.id);
+        showToast("নিষ্ক্রিয় করা হয়েছে");
+      } else {
+        await updateIncomeCategory(cat.id, { ...toPayload(cat), isActive: 1 });
+        showToast("সক্রিয় করা হয়েছে");
+      }
+      load();
+    } catch (e) { showToast(e.message, "error"); }
+  };
+
+  const set = f => e => setForm(p => ({ ...p, [f]: e.target.value }));
+
+  return (
+    <div>
+      <Toast toast={toast} />
+      <PageHeader title="আয়ের ক্যাটাগরি">
+        <Btn icon="add" onClick={openAdd}>নতুন ক্যাটাগরি</Btn>
+      </PageHeader>
+
+      <Table
+        loading={loading}
+        cols={[
+          { key: "name",        label: "নাম (English)" },
+          { key: "nameBn",      label: "নাম (বাংলা)", render: r => r.nameBn || "—" },
+          { key: "accountName", label: "আয়ের হিসাব", render: r => r.accountName || "—" },
+          { key: "isActive",    label: "অবস্থা", render: r => (
+            <Badge color={r.isActive ? "var(--success)" : "var(--muted)"}>
+              {r.isActive ? "সক্রিয়" : "নিষ্ক্রিয়"}
+            </Badge>
+          )},
+        ]}
+        rows={cats}
+        onEdit={openEdit}
+        onDelete={handleToggle}
+      />
+
+      {modal && (
+        <Modal
+          title={modal?.edit ? "ক্যাটাগরি সম্পাদনা" : "নতুন ক্যাটাগরি"}
+          onClose={() => setModal(null)}
+        >
+          <form onSubmit={handleSubmit}>
+            <Field label="নাম (English)" required>
+              <Input value={form.name} onChange={set("name")} placeholder="e.g. Donation" />
+            </Field>
+            <Field label="নাম (বাংলা)">
+              <Input value={form.nameBn} onChange={set("nameBn")} placeholder="যেমন: দান" />
+            </Field>
+            <Field label="আয়ের হিসাব (ডিফল্ট)">
+              <Select value={form.accountId} onChange={set("accountId")}>
+                <option value="">— নির্বাচন করুন —</option>
+                {accounts.map(a => <option key={a.id} value={a.id}>{a.accountCode} — {a.category}</option>)}
+              </Select>
             </Field>
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: "1rem" }}>
               <Btn variant="muted" type="button" onClick={() => setModal(null)}>বাতিল</Btn>
@@ -361,6 +491,7 @@ export default function Settings() {
     { path: "/settings/chart-of-accounts",  label: "চার্ট অব অ্যাকাউন্টস" },
     { path: "/settings/bank-accounts",      label: "ব্যাংক অ্যাকাউন্ট"     },
     { path: "/settings/expense-categories", label: "খরচের ক্যাটাগরি"         },
+    { path: "/settings/income-categories",  label: "আয়ের ক্যাটাগরি"          },
   ];
 
   useEffect(() => {
@@ -397,6 +528,7 @@ export default function Settings() {
       {path === "/settings/chart-of-accounts"  && <ChartOfAccounts />}
       {path === "/settings/bank-accounts"      && <BankAccounts />}
       {path === "/settings/expense-categories" && <ExpenseCategorySettings />}
+      {path === "/settings/income-categories"  && <IncomeCategorySettings />}
     </div>
   );
 }

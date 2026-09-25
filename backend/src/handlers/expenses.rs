@@ -27,6 +27,7 @@ pub struct CategoryPayload {
     pub name_bn:    Option<String>,
     pub parent_id:  Option<i64>,
     pub account_id: Option<i64>,
+    pub is_active:  Option<i8>,
 }
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
@@ -87,6 +88,17 @@ pub struct RejectPayload {
     pub reason: Option<String>,
 }
 
+// Expenses must be debited to a chart-of-accounts entry of type 'expense'
+async fn ensure_expense_account(db: &MySqlPool, account_id: i64) -> Result<(), AppError> {
+    let found: Option<(String,)> = sqlx::query_as("SELECT type FROM accounts WHERE id = ?")
+        .bind(account_id).fetch_optional(db).await?;
+    match found {
+        Some((t,)) if t == "expense" => Ok(()),
+        Some(_) => Err(AppError::BadRequest("Selected account is not an expense account".into())),
+        None    => Err(AppError::BadRequest("Expense account not found".into())),
+    }
+}
+
 // ── Category CRUD ────────────────────────────────────────────
 
 pub async fn cat_list(pool: web::Data<MySqlPool>) -> Result<HttpResponse, AppError> {
@@ -102,6 +114,9 @@ pub async fn cat_create(
     pool: web::Data<MySqlPool>,
     body: web::Json<CategoryPayload>,
 ) -> Result<HttpResponse, AppError> {
+    if let Some(acc) = body.account_id {
+        ensure_expense_account(pool.get_ref(), acc).await?;
+    }
     let res = sqlx::query(
         "INSERT INTO expense_categories (name, name_bn, parent_id, account_id) VALUES (?,?,?,?)"
     )
@@ -118,10 +133,16 @@ pub async fn cat_update(
     body: web::Json<CategoryPayload>,
 ) -> Result<HttpResponse, AppError> {
     let id = path.into_inner();
+    if let Some(acc) = body.account_id {
+        ensure_expense_account(pool.get_ref(), acc).await?;
+    }
     sqlx::query(
-        "UPDATE expense_categories SET name=?, name_bn=?, parent_id=?, account_id=? WHERE id=?"
+        "UPDATE expense_categories
+         SET name=?, name_bn=?, parent_id=?, account_id=?, is_active=COALESCE(?, is_active)
+         WHERE id=?"
     )
-    .bind(&body.name).bind(&body.name_bn).bind(body.parent_id).bind(body.account_id).bind(id)
+    .bind(&body.name).bind(&body.name_bn).bind(body.parent_id).bind(body.account_id)
+    .bind(body.is_active).bind(id)
     .execute(pool.get_ref()).await?;
     Ok(HttpResponse::Ok().json(json!({ "message": "Category updated" })))
 }
@@ -337,7 +358,9 @@ pub async fn create(
         .ok_or_else(|| AppError::BadRequest("Unauthorized".into()))?;
     let user_id: i64 = claims.sub.parse().unwrap_or(0);
 
-    let account_id = body.account_id.unwrap_or(1);
+    let account_id = body.account_id
+        .ok_or_else(|| AppError::BadRequest("Expense account is required".into()))?;
+    ensure_expense_account(pool.get_ref(), account_id).await?;
 
     let res = sqlx::query(
         "INSERT INTO expenses
@@ -393,7 +416,9 @@ pub async fn update(
         return Err(AppError::BadRequest("Only pending expenses can be edited".into()));
     }
 
-    let account_id = body.account_id.unwrap_or(1);
+    let account_id = body.account_id
+        .ok_or_else(|| AppError::BadRequest("Expense account is required".into()))?;
+    ensure_expense_account(pool.get_ref(), account_id).await?;
 
     sqlx::query(
         "UPDATE expenses SET expense_date=?, category=?, sub_category=?, description=?,
@@ -488,6 +513,13 @@ pub async fn approve(
         return Err(AppError::BadRequest("Only pending expenses can be approved".into()));
     }
 
+    // Older rows defaulted account_id to Cash; refuse to post until an expense account is chosen
+    let (exp_account_id,): (i64,) = sqlx::query_as(
+        "SELECT account_id FROM expenses WHERE id = ?"
+    ).bind(id).fetch_one(pool.get_ref()).await?;
+    ensure_expense_account(pool.get_ref(), exp_account_id).await
+        .map_err(|_| AppError::BadRequest("Edit this expense and select an expense account before approving".into()))?;
+
     // Determine credit account: cash=id 1, bank/mobile=id 2
     let credit_account_id: i64 = match payment_method.as_deref() {
         Some("bank") | Some("mobile_banking") => 2,
@@ -511,11 +543,7 @@ pub async fn approve(
 
     let tx_id = tx_res.last_insert_id() as i64;
 
-    // DEBIT expense account (account_id from expense)
-    let (exp_account_id,): (i64,) = sqlx::query_as(
-        "SELECT account_id FROM expenses WHERE id = ?"
-    ).bind(id).fetch_one(pool.get_ref()).await?;
-
+    // DEBIT expense account
     sqlx::query(
         "INSERT INTO transaction_lines (transaction_id, account_id, debit, credit) VALUES (?,?,?,0)"
     )
@@ -618,6 +646,7 @@ pub async fn report_summary(
     );
 
     #[derive(sqlx::FromRow, Serialize)]
+    #[serde(rename_all = "camelCase")]
     struct GrpRow { grp_key: Option<String>, total: Decimal, count: i64 }
 
     let rows: Vec<GrpRow> = sqlx::query_as(&sql)

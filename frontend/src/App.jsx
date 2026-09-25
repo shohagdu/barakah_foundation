@@ -19,6 +19,9 @@ import Collections          from "./pages/Collections.jsx";
 import Expenses            from "./pages/Expenses.jsx";
 import ExpenseForm         from "./pages/ExpenseForm.jsx";
 import ExpenseReport       from "./pages/ExpenseReport.jsx";
+import Incomes             from "./pages/Incomes.jsx";
+import IncomeForm          from "./pages/IncomeForm.jsx";
+import IncomeReport        from "./pages/IncomeReport.jsx";
 import Accounts     from "./pages/Accounts.jsx";
 import Users        from "./pages/Users.jsx";
 import { Donations, Projects, Beneficiaries, Meetings } from "./pages/Modules.jsx";
@@ -39,10 +42,14 @@ const NAV = [
   { path: "/member-summary-report",         label: "চাঁদা সারসংক্ষেপ",       icon: "reports", roles: ["admin","accountant","member"] },
   { path: "/member-overall-summary-report", label: "সার্বিক চাঁদা প্রতিবেদন", icon: "reports", roles: ["admin","accountant","member"] },
   { path: "/reports/expenses",        label: "খরচ রিপোর্ট",        icon: "expense",   roles: ["admin","accountant","member"] },
+  { path: "/reports/incomes",         label: "আয় রিপোর্ট",         icon: "money_in",  roles: ["admin","accountant","member"] },
   { path: "/reports/bank-statement",  label: "ব্যাংক স্টেটমেন্ট",  icon: "accounts",  roles: ["admin","accountant","member"] },
   // ── Expense
   { divider: "ব্যয় ব্যবস্থাপনা", roles: ["admin","accountant"] },
   { path: "/expenses",           label: "খরচের তালিকা",     icon: "expense",   roles: ["admin","accountant"] },
+  // ── Income
+  { divider: "আয় ব্যবস্থাপনা", roles: ["admin","accountant"] },
+  { path: "/incomes",            label: "আয় (Income)",      icon: "money_in",  roles: ["admin","accountant"] },
   // ── Admin
   { divider: "প্রশাসন", roles: ["admin"] },
   { path: "/users",              label: "ব্যবহারকারী",      icon: "members",   roles: ["admin"] },
@@ -200,6 +207,10 @@ function AppLayout({ user, onLogout }) {
             <Route path="/expenses/new"          element={<ExpenseForm />} />
             <Route path="/expenses/:id/edit"     element={<ExpenseForm />} />
             <Route path="/reports/expenses"          element={<ExpenseReport />} />
+            <Route path="/incomes"               element={<Incomes />} />
+            <Route path="/incomes/new"           element={<IncomeForm />} />
+            <Route path="/incomes/:id/edit"      element={<IncomeForm />} />
+            <Route path="/reports/incomes"           element={<IncomeReport />} />
             <Route path="/reports/bank-statement"    element={<BankStatement />} />
             <Route path="/accounts"      element={<Accounts />} />
             <Route path="/collections"   element={<Collections />} />

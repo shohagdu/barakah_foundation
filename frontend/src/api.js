@@ -155,6 +155,23 @@ export const deleteExpenseCategory = (id)          => api.delete(`/expense-categ
 export const getExpenseReportSummary = (p={})      => api.get(`/reports/expense-summary${qs(p)}`);
 export const getExpenseReportDetail  = (p={})      => api.get(`/reports/expense-detail${qs(p)}`);
 
+// ── Incomes ───────────────────────────────────────────────────
+export const getIncomes            = (p={})       => api.get(`/incomes${qs(p)}`);
+export const getIncomeSummary      = ()            => api.get("/incomes/summary");
+export const getIncome             = (id)          => api.get(`/incomes/${id}`);
+export const createIncome          = (body)        => api.post("/incomes", body);
+export const updateIncome          = (id, body)    => api.put(`/incomes/${id}`, body);
+export const deleteIncome          = (id)          => api.delete(`/incomes/${id}`);
+export const approveIncome         = (id)          => api.post(`/incomes/${id}/approve`, {});
+export const rejectIncome          = (id, body)    => api.post(`/incomes/${id}/reject`, body);
+
+export const getIncomeCategories   = ()            => api.get("/income-categories");
+export const createIncomeCategory  = (body)        => api.post("/income-categories", body);
+export const updateIncomeCategory  = (id, body)    => api.put(`/income-categories/${id}`, body);
+export const deleteIncomeCategory  = (id)          => api.delete(`/income-categories/${id}`);
+
+export const getIncomeReportSummary = (p={})       => api.get(`/reports/income-summary${qs(p)}`);
+
 export const getBankStatement = (p={})             => api.get(`/reports/bank-statement${qs(p)}`);
 
 // ── Collections ─────────────────────────────────────────────

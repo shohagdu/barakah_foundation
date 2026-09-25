@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { getExpenseReportSummary } from "../api.js";
+import { getIncomeReportSummary } from "../api.js";
 import { Toast, useToast } from "../components.jsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -26,12 +26,13 @@ const fmtMonthLabel = ym => {
 const GROUP_OPTIONS = [
   { value: "category",       label: "ক্যাটাগরি অনুযায়ী" },
   { value: "month",          label: "মাস অনুযায়ী" },
-  { value: "payment_method", label: "পরিশোধ পদ্ধতি অনুযায়ী" },
+  { value: "payment_method", label: "প্রাপ্তির মাধ্যম অনুযায়ী" },
+  { value: "source",         label: "উৎস অনুযায়ী" },
 ];
 
 const PM_LABEL = { cash: "নগদ", bank: "ব্যাংক", mobile_banking: "মোবাইল ব্যাংকিং" };
 
-export default function ExpenseReport() {
+export default function IncomeReport() {
   const [from,     setFrom]    = useState(monthsAgo(11));
   const [to,       setTo]      = useState(today());
   const [groupBy,  setGroupBy] = useState("category");
@@ -42,7 +43,7 @@ export default function ExpenseReport() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await getExpenseReportSummary({ from, to, group_by: groupBy });
+      const res = await getIncomeReportSummary({ from, to, group_by: groupBy });
       setData(res);
     } catch (e) { showToast(e.message, "error"); }
     finally { setLoading(false); }
@@ -81,7 +82,7 @@ export default function ExpenseReport() {
     return (
       <div style={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, padding: "10px 14px", boxShadow: "0 4px 12px rgba(0,0,0,.1)" }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>{label}</div>
-        <div style={{ color: "var(--danger)", fontWeight: 800 }}>{fmtMoney(payload[0]?.value)}</div>
+        <div style={{ color: "var(--success)", fontWeight: 800 }}>{fmtMoney(payload[0]?.value)}</div>
       </div>
     );
   };
@@ -91,7 +92,7 @@ export default function ExpenseReport() {
       <Toast toast={toast} />
 
       <div style={{ marginBottom: "1.5rem" }}>
-        <h2 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--text)", margin: 0 }}>খরচের রিপোর্ট</h2>
+        <h2 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--text)", margin: 0 }}>আয়ের রিপোর্ট</h2>
       </div>
 
       {/* Filters */}
@@ -115,8 +116,8 @@ export default function ExpenseReport() {
       {/* Summary Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(180px,1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
         {[
-          { label: "মোট খরচ",       val: fmtMoney(totalAll),      color: "var(--danger)" },
-          { label: "সর্বোচ্চ ক্যাটাগরি", val: PM_LABEL[topCat?.grpKey] || topCat?.grpKey || "—",  color: "var(--primary)" },
+          { label: "মোট আয়",       val: fmtMoney(totalAll),      color: "var(--success)" },
+          { label: "সর্বোচ্চ উৎস", val: PM_LABEL[topCat?.grpKey] || topCat?.grpKey || "—",  color: "var(--primary)" },
           { label: "প্রতি মাস গড়",  val: fmtMoney(avgMonth),      color: "var(--gold)" },
         ].map(c => (
           <div key={c.label} style={card}>
@@ -133,7 +134,7 @@ export default function ExpenseReport() {
           {/* Bar Chart + Pie */}
           <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "1rem", marginBottom: "1rem" }}>
             <div style={card}>
-              <div style={{ fontWeight: 700, marginBottom: "1rem" }}>ক্যাটাগরি / গ্রুপ অনুযায়ী খরচ</div>
+              <div style={{ fontWeight: 700, marginBottom: "1rem" }}>ক্যাটাগরি / গ্রুপ অনুযায়ী আয়</div>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={chartData} margin={{ top: 0, right: 10, left: 10, bottom: 40 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
@@ -166,14 +167,14 @@ export default function ExpenseReport() {
           {/* Line Chart */}
           {trendData.length > 0 && (
             <div style={{ ...card, marginBottom: "1rem" }}>
-              <div style={{ fontWeight: 700, marginBottom: "1rem" }}>মাসিক প্রবণতা (শেষ ১২ মাস)</div>
+              <div style={{ fontWeight: 700, marginBottom: "1rem" }}>মাসিক প্রবণতা</div>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={trendData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                   <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} tickFormatter={v => "৳" + (v/1000).toFixed(0) + "k"} />
                   <Tooltip content={<CustomTooltip />} />
-                  <Line type="monotone" dataKey="total" stroke="var(--danger)" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="total" stroke="var(--success)" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -197,14 +198,14 @@ export default function ExpenseReport() {
                       <span style={{ display: "inline-block", width: 10, height: 10, borderRadius: "50%", background: r.fill, marginRight: 8 }} />
                       {r.name}
                     </td>
-                    <td style={{ padding: "10px 12px", fontWeight: 700, color: "var(--danger)" }}>{fmtMoney(r.total)}</td>
+                    <td style={{ padding: "10px 12px", fontWeight: 700, color: "var(--success)" }}>{fmtMoney(r.total)}</td>
                     <td style={{ padding: "10px 12px" }}>{r.count}</td>
                     <td style={{ padding: "10px 12px", color: "var(--muted)" }}>{fmtMoney(r.total / (r.count || 1))}</td>
                   </tr>
                 ))}
                 <tr style={{ borderTop: "2px solid var(--border)", fontWeight: 800 }}>
                   <td style={{ padding: "10px 12px" }}>মোট</td>
-                  <td style={{ padding: "10px 12px", color: "var(--danger)" }}>{fmtMoney(totalAll)}</td>
+                  <td style={{ padding: "10px 12px", color: "var(--success)" }}>{fmtMoney(totalAll)}</td>
                   <td style={{ padding: "10px 12px" }}>{grouped.reduce((s,r) => s + Number(r.count||0), 0)}</td>
                   <td />
                 </tr>

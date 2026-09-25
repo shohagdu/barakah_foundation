@@ -1,18 +1,15 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Toast, useToast, today } from "../components.jsx";
 import {
-  Field, Input, Select, Textarea, Btn, Modal,
-  FormGrid, FormActions, Toast, useToast, today,
-} from "../components.jsx";
-import {
-  getExpenseCategories, createExpense, updateExpense, getExpense,
+  getIncomeCategories, createIncome, updateIncome, getIncome,
   getSettingsBanks, getChartOfAccounts, uploadFile,
 } from "../api.js";
 
 const EMPTY = {
-  expenseDate:   today(),
+  incomeDate:    today(),
   category:      "",
-  subCategory:   "",
+  source:        "",
   description:   "",
   amount:        "",
   paymentMethod: "cash",
@@ -23,28 +20,28 @@ const EMPTY = {
   notes:         "",
 };
 
-export default function ExpenseForm() {
-  const navigate    = useNavigate();
-  const { id }      = useParams();
-  const isEdit      = Boolean(id);
+export default function IncomeForm() {
+  const navigate = useNavigate();
+  const { id }   = useParams();
+  const isEdit   = Boolean(id);
 
-  const [form,       setForm]     = useState(EMPTY);
-  const [categories, setCats]     = useState([]);
-  const [banks,      setBanks]    = useState([]);
-  const [accounts,   setAccounts] = useState([]);
-  const [loading,    setLoading]  = useState(false);
-  const [uploading,  setUploading]= useState(false);
-  const [toast,      showToast]   = useToast();
+  const [form,       setForm]      = useState(EMPTY);
+  const [categories, setCats]      = useState([]);
+  const [accounts,   setAccounts]  = useState([]);
+  const [banks,      setBanks]     = useState([]);
+  const [loading,    setLoading]   = useState(false);
+  const [uploading,  setUploading] = useState(false);
+  const [toast,      showToast]    = useToast();
 
   useEffect(() => {
-    getExpenseCategories().then(c => setCats(c.filter(x => x.isActive !== 0))).catch(() => {});
+    getIncomeCategories().then(c => setCats(c.filter(x => x.isActive !== 0))).catch(() => {});
+    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "income"))).catch(() => {});
     getSettingsBanks().then(b => setBanks(b || [])).catch(() => {});
-    getChartOfAccounts().then(a => setAccounts((a || []).filter(x => x.accountType === "expense"))).catch(() => {});
     if (isEdit) {
-      getExpense(id).then(d => setForm({
-        expenseDate:   d.expenseDate?.split("T")[0] || today(),
+      getIncome(id).then(d => setForm({
+        incomeDate:    d.incomeDate?.split("T")[0] || today(),
         category:      d.category || "",
-        subCategory:   d.subCategory || "",
+        source:        d.source || "",
         description:   d.description || "",
         amount:        d.amount || "",
         paymentMethod: d.paymentMethod || "cash",
@@ -53,13 +50,13 @@ export default function ExpenseForm() {
         reference:     d.reference || "",
         receiptImage:  d.receiptImage || "",
         notes:         d.notes || "",
-      })).catch(() => showToast("খরচ লোড করা যায়নি", "error"));
+      })).catch(() => showToast("আয় লোড করা যায়নি", "error"));
     }
   }, [id]);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
-  // Selecting a category pre-fills its linked expense account
+  // Selecting a category pre-fills its linked income account
   const pickCategory = name => {
     const cat = categories.find(c => c.name === name);
     setForm(p => ({ ...p, category: name, accountId: cat?.accountId || p.accountId }));
@@ -80,14 +77,14 @@ export default function ExpenseForm() {
   const handleSubmit = async e => {
     e.preventDefault();
     if (!form.category)    return showToast("ক্যাটাগরি নির্বাচন করুন", "error");
-    if (!form.accountId)   return showToast("খরচের হিসাব নির্বাচন করুন", "error");
+    if (!form.accountId)   return showToast("আয়ের হিসাব নির্বাচন করুন", "error");
     if (!form.description) return showToast("বিবরণ দিন", "error");
     if (!form.amount || Number(form.amount) <= 0) return showToast("সঠিক পরিমাণ দিন", "error");
 
     const payload = {
-      expenseDate:   form.expenseDate,
+      incomeDate:    form.incomeDate,
       category:      form.category,
-      subCategory:   form.subCategory || null,
+      source:        form.source || null,
       description:   form.description,
       amount:        parseFloat(form.amount),
       paymentMethod: form.paymentMethod,
@@ -101,13 +98,13 @@ export default function ExpenseForm() {
     setLoading(true);
     try {
       if (isEdit) {
-        await updateExpense(id, payload);
-        showToast("খরচ আপডেট হয়েছে");
+        await updateIncome(id, payload);
+        showToast("আয় আপডেট হয়েছে");
       } else {
-        await createExpense(payload);
-        showToast("খরচ জমা দেওয়া হয়েছে");
+        await createIncome(payload);
+        showToast("আয় জমা দেওয়া হয়েছে");
       }
-      setTimeout(() => navigate("/expenses"), 1000);
+      setTimeout(() => navigate("/incomes"), 1000);
     } catch (err) { showToast(err.message, "error"); }
     finally { setLoading(false); }
   };
@@ -125,20 +122,20 @@ export default function ExpenseForm() {
 
       <div style={{ marginBottom: "1.5rem" }}>
         <h2 style={{ fontSize: "1.35rem", fontWeight: 800, color: "var(--text)", margin: 0 }}>
-          {isEdit ? "খরচ সম্পাদনা" : "নতুন খরচ যোগ করুন"}
+          {isEdit ? "আয় সম্পাদনা" : "নতুন আয় যোগ করুন"}
         </h2>
         <p style={{ color: "var(--muted)", fontSize: "0.82rem", marginTop: 4 }}>
-          {isEdit ? "শুধুমাত্র অপেক্ষামান খরচ সম্পাদনা করা যাবে" : "নতুন খরচের তথ্য পূরণ করুন"}
+          {isEdit ? "শুধুমাত্র অপেক্ষামান আয় সম্পাদনা করা যাবে" : "অনুমোদনের পর আয়টি নির্বাচিত হিসাবে জমা হবে"}
         </p>
       </div>
 
       <form onSubmit={handleSubmit} style={{ background: "var(--card)", borderRadius: 14, padding: "2rem", boxShadow: "0 2px 12px rgba(0,0,0,.07)", border: "1px solid var(--border)" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: "1rem" }}>
 
           {/* Date */}
           <div>
             <label style={lbl}>তারিখ *</label>
-            <input type="date" value={form.expenseDate} onChange={e => set("expenseDate", e.target.value)} style={inp} required />
+            <input type="date" value={form.incomeDate} onChange={e => set("incomeDate", e.target.value)} style={inp} required />
           </div>
 
           {/* Category */}
@@ -152,21 +149,15 @@ export default function ExpenseForm() {
             </select>
           </div>
 
-          {/* Expense Account (debited on approval) */}
+          {/* Income Account (credited on approval) */}
           <div>
-            <label style={lbl}>খরচের হিসাব (ডেবিট) *</label>
+            <label style={lbl}>আয়ের হিসাব (ক্রেডিট) *</label>
             <select value={form.accountId} onChange={e => set("accountId", e.target.value)} style={inp} required>
               <option value="">হিসাব নির্বাচন করুন</option>
               {accounts.map(a => (
                 <option key={a.id} value={a.id}>{a.accountCode} — {a.category}</option>
               ))}
             </select>
-          </div>
-
-          {/* Sub Category */}
-          <div>
-            <label style={lbl}>সাব-ক্যাটাগরি</label>
-            <input value={form.subCategory} onChange={e => set("subCategory", e.target.value)} style={inp} placeholder="ঐচ্ছিক" />
           </div>
 
           {/* Amount */}
@@ -176,16 +167,22 @@ export default function ExpenseForm() {
               onChange={e => set("amount", e.target.value)} style={inp} placeholder="0.00" required />
           </div>
 
+          {/* Source */}
+          <div style={{ gridColumn: "1 / -1" }}>
+            <label style={lbl}>উৎস / প্রদানকারী</label>
+            <input value={form.source} onChange={e => set("source", e.target.value)} style={inp} placeholder="যেমন: দাতার নাম, ব্যাংক, প্রতিষ্ঠান (ঐচ্ছিক)" />
+          </div>
+
           {/* Description — full width */}
-          <div style={{ gridColumn: "span 2" }}>
+          <div style={{ gridColumn: "1 / -1" }}>
             <label style={lbl}>বিবরণ *</label>
             <textarea value={form.description} onChange={e => set("description", e.target.value)}
-              style={{ ...inp, minHeight: 80, resize: "vertical" }} placeholder="খরচের বিস্তারিত বিবরণ..." required />
+              style={{ ...inp, minHeight: 80, resize: "vertical" }} placeholder="আয়ের বিস্তারিত বিবরণ..." required />
           </div>
 
           {/* Payment Method */}
           <div>
-            <label style={lbl}>পরিশোধ পদ্ধতি</label>
+            <label style={lbl}>প্রাপ্তির মাধ্যম (ডেবিট)</label>
             <select value={form.paymentMethod} onChange={e => set("paymentMethod", e.target.value)} style={inp}>
               <option value="cash">নগদ</option>
               <option value="bank">ব্যাংক</option>
@@ -223,7 +220,7 @@ export default function ExpenseForm() {
           </div>
 
           {/* Notes — full width */}
-          <div style={{ gridColumn: "span 2" }}>
+          <div style={{ gridColumn: "1 / -1" }}>
             <label style={lbl}>নোট</label>
             <textarea value={form.notes} onChange={e => set("notes", e.target.value)}
               style={{ ...inp, minHeight: 60, resize: "vertical" }} placeholder="অতিরিক্ত তথ্য..." />
@@ -231,13 +228,13 @@ export default function ExpenseForm() {
         </div>
 
         <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", marginTop: "1.5rem", paddingTop: "1.5rem", borderTop: "1px solid var(--border)" }}>
-          <button type="button" onClick={() => navigate("/expenses")}
+          <button type="button" onClick={() => navigate("/incomes")}
             style={{ padding: "10px 20px", borderRadius: 9, border: "1.5px solid var(--border)", background: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 600, color: "var(--muted)" }}>
             বাতিল
           </button>
           <button type="submit" disabled={loading}
             style={{ padding: "10px 24px", borderRadius: 9, border: "none", background: "var(--primary)", color: "#fff", cursor: loading ? "not-allowed" : "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: "0.95rem" }}>
-            {loading ? "জমা হচ্ছে..." : isEdit ? "আপডেট করুন" : "খরচ জমা দিন"}
+            {loading ? "জমা হচ্ছে..." : isEdit ? "আপডেট করুন" : "আয় জমা দিন"}
           </button>
         </div>
       </form>
